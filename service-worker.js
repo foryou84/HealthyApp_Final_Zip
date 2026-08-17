@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v4-meal-table';
+const CACHE_NAME='healthy-app-v5-meal-table';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -27,7 +27,7 @@ async function htmlWithMealTable(request){
 
   let html=await response.text();
   if(!html.includes('meal-table-fix.js')){
-    const tag='<script src="./meal-table-fix.js?v=20260818-2"></script>';
+    const tag='<script src="./meal-table-fix.js?v=20260818-3"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
   }
 
@@ -41,6 +41,10 @@ self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(event.request.mode==='navigate' && url.origin===self.location.origin){
     event.respondWith(htmlWithMealTable(event.request));
+    return;
+  }
+  if(url.pathname.endsWith('/meal-table-fix.js')){
+    event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
   }
   event.respondWith(caches.match(event.request).then(cached=>cached||fetch(event.request)));
