@@ -4,11 +4,26 @@ module.exports = async function handler(req, res) {
   const { provider = 'auto', prompt = '', imageDataUrl = null } = req.body || {};
   if (!prompt || !String(prompt).trim()) return res.status(400).json({ error: 'Missing prompt' });
 
+  // The mobile UI currently renders AI text as plain text rather than Markdown.
+  // Ask the models for clean Hebrew plain text so users do not see ** / # markers.
+  const nutritionInstructions = imageDataUrl ? '' : `
+הנחיות תשובה לאפליקציה:
+- ענה בעברית ברורה, קצרה ומעשית.
+- השתמש קודם כל בנתוני המשתמש, היעדים, הצריכה והרשומות שסופקו בשאלה. אל תגיד שאין נתונים אם מופיעים נתונים בהקשר.
+- כשמבקשים מה לאכול או כמה נשאר, חשב מול היעד והצריכה שסופקו והצג מספרים שימושיים.
+- אם אין רשומות מזון היום, ציין זאת בקצרה והצע בהתאם ליעדים שנותרו.
+- בתשובת ארוחה, העדף מבנה: הצעה לארוחה, רכיבים וכמויות, ואז סה״כ משוער של קלוריות וחלבון. הוסף פחמימה ושומן כשזה מועיל.
+- אל תשתמש ב-Markdown בכלל: בלי **, בלי *, בלי # ובלי טבלאות Markdown. אפשר להשתמש באימוג׳י ובשורות נפרדות.
+- אל תמציא מזונות שנאכלו או נתוני עבר שלא סופקו.
+
+`;
+  const effectivePrompt = nutritionInstructions + String(prompt);
+
   async function gemini() {
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error('GEMINI_API_KEY is not configured');
 
-    const parts = [{ text: String(prompt) }];
+    const parts = [{ text: effectivePrompt }];
     if (imageDataUrl) {
       const m = String(imageDataUrl).match(/^data:([^;]+);base64,(.+)$/s);
       if (!m) throw new Error('Invalid image data');
@@ -42,7 +57,7 @@ module.exports = async function handler(req, res) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error('OPENAI_API_KEY is not configured');
 
-    const content = [{ type: 'input_text', text: String(prompt) }];
+    const content = [{ type: 'input_text', text: effectivePrompt }];
     if (imageDataUrl) content.push({ type: 'input_image', image_url: imageDataUrl, detail: 'auto' });
 
     const model = process.env.OPENAI_MODEL || 'gpt-5.6';
