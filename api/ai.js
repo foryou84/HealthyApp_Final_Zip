@@ -15,10 +15,7 @@ module.exports = async function handler(req, res) {
       parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
     }
 
-    // Use the cost-efficient stable Flash-Lite model as the primary Gemini endpoint.
-    // This is a better fit for the app's high-volume nutrition/chat requests and
-    // avoids forcing a paid-only/newer model when the API key is on a free tier.
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+    const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
       {
@@ -94,7 +91,6 @@ module.exports = async function handler(req, res) {
       text = await openai();
       used = 'openai';
     } else {
-      // AUTO is intentionally Gemini-first. OpenAI is only the fallback.
       try {
         text = await gemini();
         used = 'gemini';
