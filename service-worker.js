@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v20-safari-home-screen';
+const CACHE_NAME='healthy-app-v21-chat-meal-lines';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -27,7 +27,7 @@ async function htmlWithMealTable(request){
 
   let html=await response.text();
   if(!html.includes('meal-table-fix.js')){
-    const tag='<script src="./meal-table-fix.js?v=20260818-17"></script>';
+    const tag='<script src="./meal-table-fix.js?v=20260818-18"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
   }
 
