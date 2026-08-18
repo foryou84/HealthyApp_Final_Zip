@@ -24,6 +24,62 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+  // iOS only opens its native keyboard when focus happens synchronously inside
+  // the user's tap. Keep the in-app keyboard as a fallback, but restore a
+  // direct native-keyboard path for normal text and numeric inputs.
+  window.focusIphoneKeyboard = inputOrId => {
+    const input = typeof inputOrId === 'string' ? document.getElementById(inputOrId) : inputOrId;
+    if (!input) return;
+    const overlay = document.getElementById('appKeyboard');
+    if (overlay) overlay.classList.add('hide');
+    input.disabled = false;
+    input.readOnly = false;
+    input.style.pointerEvents = 'auto';
+    input.style.userSelect = 'text';
+    input.style.webkitUserSelect = 'text';
+    input.focus({ preventScroll: false });
+    try {
+      const end = String(input.value || '').length;
+      input.setSelectionRange(end, end);
+    } catch (_) {}
+  };
+
+  const installNativeKeyboardControls = () => {
+    const quickInput = document.getElementById('quick');
+    const manualInput = document.getElementById('mName');
+    [quickInput, manualInput].filter(Boolean).forEach(input => {
+      input.setAttribute('inputmode', 'text');
+      input.setAttribute('autocomplete', 'off');
+      input.style.fontSize = '16px';
+      if (!input.dataset.iphoneFocusReady) {
+        input.addEventListener('touchstart', () => window.focusIphoneKeyboard(input), { passive: true });
+        input.dataset.iphoneFocusReady = '1';
+      }
+    });
+    if (quickInput && !document.getElementById('nativeQuickKeyboard')) {
+      const button = document.createElement('button');
+      button.id = 'nativeQuickKeyboard';
+      button.type = 'button';
+      button.textContent = '⌨️ הקלד במקלדת iPhone';
+      button.style.cssText = 'margin-top:8px;background:#eef6ff;color:#1264c5';
+      button.addEventListener('touchstart', () => window.focusIphoneKeyboard(quickInput), { passive: true });
+      button.addEventListener('click', () => window.focusIphoneKeyboard(quickInput));
+      quickInput.closest('.quick')?.insertAdjacentElement('afterend', button);
+    }
+    if (manualInput && !document.getElementById('nativeManualKeyboard')) {
+      const button = document.createElement('button');
+      button.id = 'nativeManualKeyboard';
+      button.type = 'button';
+      button.textContent = '⌨️ הקלד במקלדת iPhone';
+      button.style.cssText = 'margin-top:6px;background:#eaf3ff;color:#1264c5';
+      button.addEventListener('touchstart', () => window.focusIphoneKeyboard(manualInput), { passive: true });
+      button.addEventListener('click', () => window.focusIphoneKeyboard(manualInput));
+      manualInput.insertAdjacentElement('afterend', button);
+      const fallback = manualInput.parentElement?.querySelector('button:not(#nativeManualKeyboard)');
+      if (fallback) fallback.textContent = '⌨️ מקלדת האפליקציה - גיבוי';
+    }
+  };
+
   // Strengthen MABAT matching for named food varieties. The main database uses
   // plural category forms such as "אגוזי לוז", while Gemini may return
   // "אגוז לוז". Without normalization a generic "אגוז מבושל" can win.
@@ -387,8 +443,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => refresh(true), 50));
-  else setTimeout(() => refresh(true), 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installNativeKeyboardControls(); refresh(true); }, 50));
+  else setTimeout(() => { installNativeKeyboardControls(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
