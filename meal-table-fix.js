@@ -53,6 +53,18 @@
   // Let the user choose the exact MABAT record for every Gemini result instead
   // of silently accepting the first automatic match.
   if (typeof window.renderAiComparison === 'function' && !window.__mabatChoiceList) {
+    // A preparation bonus (for example "מבושל") may only reorder genuine text
+    // matches. It must never introduce unrelated cooked foods into the list.
+    window.findMatches = function relevantMabatMatches(query, limit = 50) {
+      return allFoods().map(food => {
+        const lexical = betterScoreFood(query, food);
+        return { food, lexical, score: lexical > 0 ? lexical + defaultReadyFoodBonus(query, food) : lexical };
+      }).filter(result => result.lexical > 0)
+        .sort((a, b) => b.score - a.score).slice(0, limit).map(result => result.food);
+    };
+    window.findFood = function relevantMabatFood(query) {
+      return window.findMatches(query, 1)[0] || null;
+    };
     const originalRenderAiComparison = window.renderAiComparison;
     const ensureMabatMatches = item => {
       if (!Array.isArray(item.mabatMatches)) item.mabatMatches = typeof findMatches === 'function' ? findMatches(item.aiName, 50) : [];
