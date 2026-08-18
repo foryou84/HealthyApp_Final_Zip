@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v19-ios-keyboard-recovery';
+const CACHE_NAME='healthy-app-v20-safari-home-screen';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
