@@ -91,6 +91,43 @@
     } catch (_) {}
   };
 
+  const prepareNativeTextControl = input => {
+    if (!(input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement)) return;
+    if (input instanceof HTMLInputElement && ['hidden', 'file', 'checkbox', 'radio', 'button', 'submit'].includes(input.type)) return;
+    input.disabled = false;
+    input.readOnly = false;
+    if (!input.getAttribute('inputmode') || input.getAttribute('inputmode') === 'none') {
+      const numeric = input instanceof HTMLInputElement && ['number', 'tel'].includes(input.type);
+      input.setAttribute('inputmode', numeric ? 'decimal' : 'text');
+    }
+    input.style.fontSize = '16px';
+    input.style.pointerEvents = 'auto';
+    input.style.userSelect = 'text';
+    input.style.webkitUserSelect = 'text';
+    input.style.touchAction = 'manipulation';
+    if (input.dataset.iosNativeKeyboardReady) return;
+    input.dataset.iosNativeKeyboardReady = '1';
+    input.addEventListener('touchstart', () => {
+      // Run synchronously inside the user's touch. This also recovers the iOS
+      // state where a caret is visible but the software keyboard stayed closed.
+      input.readOnly = false;
+      input.focus({ preventScroll: true });
+    }, { passive: true });
+  };
+
+  const installGlobalIosKeyboardRecovery = () => {
+    document.querySelectorAll('input,textarea').forEach(prepareNativeTextControl);
+    if (window.__iosKeyboardObserver) return;
+    window.__iosKeyboardObserver = new MutationObserver(records => {
+      records.forEach(record => record.addedNodes.forEach(node => {
+        if (!(node instanceof Element)) return;
+        if (node.matches('input,textarea')) prepareNativeTextControl(node);
+        node.querySelectorAll?.('input,textarea').forEach(prepareNativeTextControl);
+      }));
+    });
+    window.__iosKeyboardObserver.observe(document.body, { childList: true, subtree: true });
+  };
+
   const installNativeKeyboardControls = () => {
     const quickInput = document.getElementById('quick');
     const manualInput = document.getElementById('mName');
@@ -510,8 +547,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installNativeKeyboardControls(); refresh(true); }, 50));
-  else setTimeout(() => { installNativeKeyboardControls(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
