@@ -32,12 +32,7 @@
     if (!input) return;
     const overlay = document.getElementById('appKeyboard');
     if (overlay) overlay.classList.add('hide');
-    input.disabled = false;
-    input.readOnly = false;
-    input.style.pointerEvents = 'auto';
-    input.style.userSelect = 'text';
-    input.style.webkitUserSelect = 'text';
-    input.focus({ preventScroll: false });
+    input.focus();
     try {
       const end = String(input.value || '').length;
       input.setSelectionRange(end, end);
@@ -48,13 +43,16 @@
     const quickInput = document.getElementById('quick');
     const manualInput = document.getElementById('mName');
     [quickInput, manualInput].filter(Boolean).forEach(input => {
+      input.type = 'text';
+      input.disabled = false;
+      input.readOnly = false;
       input.setAttribute('inputmode', 'text');
       input.setAttribute('autocomplete', 'off');
+      input.setAttribute('enterkeyhint', 'done');
       input.style.fontSize = '16px';
-      if (!input.dataset.iphoneFocusReady) {
-        input.addEventListener('touchstart', () => window.focusIphoneKeyboard(input), { passive: true });
-        input.dataset.iphoneFocusReady = '1';
-      }
+      input.style.pointerEvents = 'auto';
+      // Do not attach touch handlers here. Safari must receive the original tap
+      // on the input itself in order to open the native iPhone keyboard.
     });
     if (quickInput && !document.getElementById('nativeQuickKeyboard')) {
       const button = document.createElement('button');
@@ -62,7 +60,6 @@
       button.type = 'button';
       button.textContent = '⌨️ הקלד במקלדת iPhone';
       button.style.cssText = 'margin-top:8px;background:#eef6ff;color:#1264c5';
-      button.addEventListener('touchstart', () => window.focusIphoneKeyboard(quickInput), { passive: true });
       button.addEventListener('click', () => window.focusIphoneKeyboard(quickInput));
       quickInput.closest('.quick')?.insertAdjacentElement('afterend', button);
     }
@@ -72,7 +69,6 @@
       button.type = 'button';
       button.textContent = '⌨️ הקלד במקלדת iPhone';
       button.style.cssText = 'margin-top:6px;background:#eaf3ff;color:#1264c5';
-      button.addEventListener('touchstart', () => window.focusIphoneKeyboard(manualInput), { passive: true });
       button.addEventListener('click', () => window.focusIphoneKeyboard(manualInput));
       manualInput.insertAdjacentElement('afterend', button);
       const fallback = manualInput.parentElement?.querySelector('button:not(#nativeManualKeyboard)');
