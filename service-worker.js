@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v13-iphone-native-keyboard';
+const CACHE_NAME='healthy-app-v14-core-food-matching';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -27,7 +27,7 @@ async function htmlWithMealTable(request){
 
   let html=await response.text();
   if(!html.includes('meal-table-fix.js')){
-    const tag='<script src="./meal-table-fix.js?v=20260818-11"></script>';
+    const tag='<script src="./meal-table-fix.js?v=20260818-12"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
   }
 
