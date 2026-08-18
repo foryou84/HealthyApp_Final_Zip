@@ -118,10 +118,12 @@
       return coreFoodToken(normalized);
     };
     const hasCoreFoodMatch = (query, food) => {
-      const queryTokens = coreClean(query).split(/\s+/).map(relevantToken).filter(Boolean);
+      const queryTokens = [...new Set(coreClean(query).split(/\s+/).map(relevantToken).filter(Boolean))];
       if (!queryTokens.length) return false;
-      const foodTokens = coreClean([food.name, ...(food.a || [])].join(' ')).split(/\s+/).map(relevantToken).filter(Boolean);
-      return queryTokens.some(token => foodTokens.includes(token));
+      const foodTokens = new Set(coreClean([food.name, ...(food.a || [])].join(' ')).split(/\s+/).map(relevantToken).filter(Boolean));
+      const matchedCoreWords = queryTokens.filter(token => foodTokens.has(token)).length;
+      const requiredCoreWords = Math.min(2, queryTokens.length);
+      return matchedCoreWords >= requiredCoreWords;
     };
     window.findMatches = function relevantMabatMatches(query, limit = 50) {
       return allFoods().map(food => {
