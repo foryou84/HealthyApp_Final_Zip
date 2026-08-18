@@ -24,6 +24,28 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+  // Strengthen MABAT matching for named food varieties. The main database uses
+  // plural category forms such as "אגוזי לוז", while Gemini may return
+  // "אגוז לוז". Without normalization a generic "אגוז מבושל" can win.
+  if (typeof window.betterScoreFood === 'function' && !window.__specificFoodScoreFix) {
+    const originalFoodScore = window.betterScoreFood;
+    const cleanFoodText = value => String(value || '').toLowerCase()
+      .replace(/["׳״'`.,:;!?()\[\]{}\/\\_-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const foodToken = word => ({ אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן' }[word] || word);
+    window.betterScoreFood = function specificFoodScore(query, food) {
+      const baseScore = originalFoodScore(query, food);
+      if (baseScore < 0 || !food) return baseScore;
+      const queryWords = cleanFoodText(query).split(/\s+/).filter(Boolean).map(foodToken);
+      const names = [food.name, ...(food.a || [])].map(cleanFoodText);
+      const nameWords = names.flatMap(name => name.split(/\s+/).filter(Boolean).map(foodToken));
+      const matched = queryWords.filter(word => nameWords.includes(word));
+      const normalizedExtra = Math.max(0, matched.length - Math.floor(baseScore / 350)) * 350;
+      const varietyBonus = queryWords.slice(1).filter(word => nameWords.includes(word)).length * 500;
+      return baseScore + normalizedExtra + varietyBonus;
+    };
+    window.__specificFoodScoreFix = true;
+  }
+
   const normalizeMeal = value => {
     const raw = String(value || '').trim().toLowerCase();
     if (!raw) return 'ביניים';
