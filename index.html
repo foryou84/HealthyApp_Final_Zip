@@ -80,6 +80,18 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .compare-actions{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-top:10px}
 .compare-photo{width:100%;max-height:190px;object-fit:cover;border-radius:14px;margin:8px 0}
 .loading-btn{opacity:.65;pointer-events:none}
+.amount-stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px}
+.amount-stepper button{margin:0;padding:9px 4px;background:#eef2ff;color:#3730a3;font-size:13px}
+.app-keyboard-overlay{position:fixed;inset:0;background:#0008;z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+.app-keyboard-overlay.hide{display:none}
+.app-keyboard-panel{background:#f8fafc;width:min(100%,560px);border-radius:22px 22px 0 0;padding:14px 10px calc(14px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px #0003}
+.app-keyboard-title{font-weight:900;font-size:18px;margin-bottom:8px}
+.app-keyboard-display{background:#fff;border:2px solid #93c5fd;border-radius:14px;min-height:52px;padding:11px;font-size:22px;font-weight:800;direction:rtl;overflow-wrap:anywhere}
+.app-keyboard-keys{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:9px}
+.app-keyboard-keys.numeric{grid-template-columns:repeat(3,1fr)}
+.app-keyboard-keys button{margin:0;padding:10px 2px;border-radius:10px;background:#fff;color:#111827;border:1px solid #d1d5db;font-size:17px}
+.app-keyboard-actions{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:9px}
+.app-keyboard-actions button{margin:0}
 @media(max-width:520px){
   .manual-top{grid-template-columns:1fr 1fr}
   .manual-top .name-wrap{grid-column:1/-1}
@@ -191,7 +203,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="small">בחר מאכל, שלוף ערכים מהמאגר או מ-AI, עדכן כמות ושמור לארוחה.</div>
 
 <div class="manual-top">
-  <div class="name-wrap"><label>שם המאכל</label><input id="mName" value="קוטג׳ 5%"></div>
+  <div class="name-wrap"><label>שם המאכל</label><input id="mName" value="קוטג׳ 5%"><button type="button" style="background:#eef2ff;color:#3730a3;margin-top:6px" onclick="editManualFoodName()">⌨️ ערוך שם במקלדת האפליקציה</button></div>
   <div><label>כמות</label><input id="mAmount" value="3" inputmode="decimal" oninput="manualPreview()"></div>
   <div><label>יחידה</label><select id="mUnit" onchange="manualPreview()"><option value="g">גרם/מ״ל</option><option value="cup">כוס</option><option value="tbsp" selected>כף</option><option value="tsp">כפית</option><option value="unit">יחידה</option></select></div>
 </div>
@@ -316,6 +328,19 @@ const unitName={g:'גרם/מ״ל',cup:'כוס',tbsp:'כף',tsp:'כפית',unit:'
 function n(x){return Number(String(x||'').replace(',','.'))||0}
 function r(x){return Math.round((x||0)*10)/10}
 function clean(s){return String(s||'').toLowerCase().replace(/[״׳'"]/g,'').trim()}
+let appKeyboardValue='',appKeyboardSave=null;
+function ensureAppKeyboard(){
+ if(document.getElementById('appKeyboard'))return;
+ let el=document.createElement('div');el.id='appKeyboard';el.className='app-keyboard-overlay hide';
+ el.innerHTML='<div class="app-keyboard-panel" onclick="event.stopPropagation()"><div id="appKeyboardTitle" class="app-keyboard-title"></div><div id="appKeyboardDisplay" class="app-keyboard-display"></div><div id="appKeyboardKeys" class="app-keyboard-keys"></div><div class="app-keyboard-actions"><button type="button" style="background:#6b7280" onclick="closeAppKeyboard()">בטל</button><button type="button" onclick="saveAppKeyboard()">אישור</button></div></div>';
+ el.onclick=closeAppKeyboard;document.body.appendChild(el);
+}
+function openAppKeyboard(title,value,type,onSave){ensureAppKeyboard();appKeyboardValue=String(value??'');appKeyboardSave=onSave;document.getElementById('appKeyboardTitle').textContent=title;let keys=type==='number'?['1','2','3','4','5','6','7','8','9','0','.','⌫','נקה']:['1','2','3','4','5','6','7','8','9','0','ק','ר','א','ט','ו','ן','ם','פ','ש','ד','ג','כ','ע','י','ח','ל','ך','ף','ז','ס','ב','ה','נ','מ','צ','ת','ץ','%','-','⌫','רווח','נקה'],keysBox=document.getElementById('appKeyboardKeys');keysBox.className='app-keyboard-keys '+(type==='number'?'numeric':'');keysBox.innerHTML=keys.map(k=>`<button type="button" data-key="${k}" onclick="appKeyboardKey(this.dataset.key)">${k}</button>`).join('');renderAppKeyboard();document.getElementById('appKeyboard').classList.remove('hide')}
+function renderAppKeyboard(){document.getElementById('appKeyboardDisplay').textContent=appKeyboardValue||' '}
+function appKeyboardKey(k){if(k==='⌫')appKeyboardValue=appKeyboardValue.slice(0,-1);else if(k==='נקה')appKeyboardValue='';else if(k==='רווח')appKeyboardValue+=' ';else appKeyboardValue+=k;renderAppKeyboard()}
+function closeAppKeyboard(){let el=document.getElementById('appKeyboard');if(el)el.classList.add('hide');appKeyboardSave=null}
+function saveAppKeyboard(){let cb=appKeyboardSave,val=appKeyboardValue.trim();closeAppKeyboard();if(cb)cb(val)}
+function editManualFoodName(){openAppKeyboard('עריכת שם המאכל',mName.value,'text',val=>{if(val)mName.value=val})}
 function save(){localStorage.setItem(KEY,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
 function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render()}
 function setMeal(m,el){st.currentMeal=m;document.querySelectorAll('.meal-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');save()}
@@ -419,13 +444,14 @@ function renderAiComparison(){
  aiEditBox.innerHTML=`<b>בדיקה לפני הוספה</b><div class=small>Gemini זיהה ראשון. בחר את מקור הערכים לכל פריט, בדוק את הכמות ורק אז אשר.</div>${photo}`+pendingAiFoods.map((x,i)=>{
    let a=x.approved?foodActual(x.approved,x.amount):null,m=x.mabat?foodActual(x.mabat,x.amount):null;
    let options=`<option value="gemini" ${x.choice==='gemini'?'selected':''}>Gemini</option>${x.approved?`<option value="approved" ${x.choice==='approved'?'selected':''}>ערך שאושר בעבר</option>`:''}${x.mabat?`<option value="mabat" ${x.choice==='mabat'?'selected':''}>MABAT</option>`:''}`;
-   return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${x.approved?'נמצא ערך מאושר':(x.mabat?'נמצאה התאמת MABAT':'לא נמצאה התאמה במאגר')}</span></div><label>כמות בגרם/מ״ל</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="decimal" enterkeyhint="done" type="text" pattern="[0-9.,]*" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"><button type="button" style="background:#eef2ff;color:#3730a3;margin-top:7px" onclick="editPendingAmount(${i})">✏️ ערוך כמות לפני הוספה</button><div id="amountHelp${i}" class="small hide">המספר מסומן. הקלד כמות חדשה ולחץ סיום במקלדת.</div><label>מקור הערכים שיישמר</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',x.ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',x.ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',x.ai.c,a?.c,m?.c)}${comparisonRow('שומן',x.ai.f,a?.f,m?.f)}</table><div class=small>התאמת מאגר: ${x.mabat?.name||'לא נמצאה'}${x.approved?` | ערך מאושר: ${x.approved.name}`:''}</div></div>`
+   return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${x.approved?'נמצא ערך מאושר':(x.mabat?'נמצאה התאמת MABAT':'לא נמצאה התאמה במאגר')}</span></div><label>כמות בגרם/מ״ל - לחץ על המספר לעריכה</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="numeric" enterkeyhint="done" type="tel" pattern="[0-9]*" autocomplete="off" onclick="this.focus();this.select()" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"><button type="button" style="background:#eef2ff;color:#3730a3;margin-top:7px" ontouchstart="event.preventDefault();editPendingAmount(${i})" onpointerdown="if(event.pointerType!=='touch'){event.preventDefault();editPendingAmount(${i})}" onclick="event.preventDefault()">✏️ ערוך כמות לפני הוספה</button><div class="amount-stepper"><button type="button" onclick="adjustPendingAmount(${i},-100)">-100</button><button type="button" onclick="adjustPendingAmount(${i},-10)">-10</button><button type="button" onclick="adjustPendingAmount(${i},10)">+10</button><button type="button" onclick="adjustPendingAmount(${i},100)">+100</button></div><div id="amountHelp${i}" class="small hide">המספר מסומן. הקלד כמות חדשה, או השתמש בכפתורי הפלוס והמינוס.</div><label>מקור הערכים שיישמר</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',x.ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',x.ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',x.ai.c,a?.c,m?.c)}${comparisonRow('שומן',x.ai.f,a?.f,m?.f)}</table><div class=small>התאמת מאגר: ${x.mabat?.name||'לא נמצאה'}${x.approved?` | ערך מאושר: ${x.approved.name}`:''}</div></div>`
  }).join('')+`<div class=compare-actions><button onclick="confirmAiFoods()">אשר והוסף ל-${st.currentMeal}</button><button style="background:#6b7280" onclick="clearAiReview()">בטל</button></div>`;
 }
 function updateAiAmount(i,val){let x=pendingAiFoods[i],old=x.amount||100,nu=n(val)||old,fac=nu/old;x.amount=nu;delete x.draftAmount;x.ai.cal*=fac;x.ai.p*=fac;x.ai.c*=fac;x.ai.f*=fac;x.ai.v*=fac;renderAiComparison()}
 function previewPendingAmount(i,val){let nu=n(val);if(nu>0)pendingAiFoods[i].draftAmount=nu}
 function commitPendingAmount(i,val){let nu=n(val);if(nu>0)updateAiAmount(i,nu)}
-function editPendingAmount(i){let input=document.getElementById('pendingAmount'+i),help=document.getElementById('amountHelp'+i);if(!input)return;input.focus({preventScroll:true});input.select();try{input.setSelectionRange(0,input.value.length)}catch(e){}if(help)help.classList.remove('hide');input.scrollIntoView({behavior:'smooth',block:'center'})}
+function editPendingAmount(i){let x=pendingAiFoods[i],current=x.draftAmount||x.amount;openAppKeyboard('עריכת כמות בגרם/מ״ל',r(current),'number',val=>{let nu=n(val);if(nu>0)updateAiAmount(i,nu);else alert('יש להזין כמות גדולה מאפס')})}
+function adjustPendingAmount(i,delta){let x=pendingAiFoods[i],current=x.draftAmount||x.amount,nu=Math.max(1,r(current+delta));updateAiAmount(i,nu)}
 function setComparisonChoice(i,choice){pendingAiFoods[i].choice=choice}
 function rememberApprovedFood(food,photo){st.approvedFoods=st.approvedFoods||[];let approved={...food,a:[food.name],src:'אושר על ידי המשתמש',approvedAt:new Date().toISOString(),photo:photo||''};let idx=st.approvedFoods.findIndex(x=>clean(x.name)===clean(food.name));if(idx>=0)st.approvedFoods[idx]=approved;else st.approvedFoods.unshift(approved)}
 function confirmAiFoods(){pendingAiFoods.forEach(x=>{if(x.draftAmount>0&&x.draftAmount!==x.amount){let fac=x.draftAmount/x.amount;x.amount=x.draftAmount;x.ai.cal*=fac;x.ai.p*=fac;x.ai.c*=fac;x.ai.f*=fac;x.ai.v*=fac}let food=selectedComparisonFood(x);addEntry(food,x.amount);rememberApprovedFood(food,pendingAiPhoto)});let count=pendingAiFoods.length;clearAiReview();render();msg(`${count} פריטים אושרו ונוספו ל-${st.currentMeal}. הערכים נשמרו להשוואות עתידיות.`,'ok')}
@@ -578,22 +604,13 @@ function entryPer100(e){
 function editEntryAmount(id){
   let e=(st.entries||[]).find(x=>String(x.id)===String(id));
   if(!e)return;
-  let val=prompt(`כמות חדשה עבור ${e.name}`,r(e.amount));
-  if(val===null)return;
-  let newAmount=n(val);
-  if(newAmount<=0){alert('הכמות חייבת להיות גדולה מאפס');return;}
   let per100=entryPer100(e);
   if(!per100){alert('לא ניתן לערוך את הפריט הזה');return;}
-  let q=newAmount/100;
-  e.amount=newAmount;
-  e.cal=per100.cal*q;
-  e.p=per100.p*q;
-  e.c=per100.c*q;
-  e.f=per100.f*q;
-  e.v=per100.v*q;
-  e.w=per100.w*q;
-  save();
-  render();
+  openAppKeyboard(`כמות חדשה עבור ${e.name}`,r(e.amount),'number',val=>{
+    let newAmount=n(val);
+    if(newAmount<=0){if(confirm('כמות 0. למחוק את המאכל?'))delE(id);return}
+    let q=newAmount/100;e.amount=newAmount;e.cal=per100.cal*q;e.p=per100.p*q;e.c=per100.c*q;e.f=per100.f*q;e.v=per100.v*q;e.w=per100.w*q;save();render();
+  });
 }
 function toggleMealDetails(id){
   let el=document.getElementById(id);

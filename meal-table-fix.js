@@ -208,25 +208,26 @@
       return;
     }
 
-    const answer = window.prompt(`כמות חדשה עבור ${name}:`, String(current));
-    if (answer === null) return;
-    const next = num(answer);
-    if (!(next > 0)) {
-      if (next === 0 && window.confirm('כמות 0 תמחק את המאכל. למחוק?')) {
-        window.deleteMealEntry(index);
-      } else if (next !== 0) {
-        alert('יש להזין כמות גדולה מ-0.');
+    const applyValue = answer => {
+      const next = num(answer);
+      if (!(next > 0)) {
+        if (next === 0 && window.confirm('כמות 0 תמחק את המאכל. למחוק?')) window.deleteMealEntry(index);
+        else if (next !== 0) alert('יש להזין כמות גדולה מ-0.');
+        return;
       }
-      return;
+      const previousEntries = state.entries.map(item => ({ ...item }));
+      const ratio = next / current;
+      entry[key] = next;
+      scaleExistingNutrition(entry, ratio);
+      persistState(state, previousEntries);
+      lastSignature = '';
+      renderMealJournalTable(true);
+    };
+    if (typeof window.openAppKeyboard === 'function') window.openAppKeyboard(`כמות חדשה עבור ${name}`, String(current), 'number', applyValue);
+    else {
+      const answer = window.prompt(`כמות חדשה עבור ${name}:`, String(current));
+      if (answer !== null) applyValue(answer);
     }
-
-    const previousEntries = state.entries.map(item => ({ ...item }));
-    const ratio = next / current;
-    entry[key] = next;
-    scaleExistingNutrition(entry, ratio);
-    persistState(state, previousEntries);
-    lastSignature = '';
-    renderMealJournalTable(true);
   };
 
   function renderMealJournalTable(force = false) {
