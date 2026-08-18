@@ -50,6 +50,55 @@
     window.__specificFoodScoreFix = true;
   }
 
+  // Let the user choose the exact MABAT record for every Gemini result instead
+  // of silently accepting the first automatic match.
+  if (typeof window.renderAiComparison === 'function' && !window.__mabatChoiceList) {
+    const originalRenderAiComparison = window.renderAiComparison;
+    const ensureMabatMatches = item => {
+      if (!Array.isArray(item.mabatMatches)) item.mabatMatches = typeof findMatches === 'function' ? findMatches(item.aiName, 50) : [];
+      if (!item.mabat && item.mabatMatches.length) item.mabat = item.mabatMatches[0];
+      return item.mabatMatches;
+    };
+    window.selectMabatMatch = (foodIndex, matchIndex) => {
+      const item = pendingAiFoods[Number(foodIndex)];
+      if (!item) return;
+      const selected = ensureMabatMatches(item)[Number(matchIndex)];
+      if (!selected) return;
+      item.mabat = selected;
+      item.choice = 'mabat';
+      window.renderAiComparison();
+    };
+    window.renderAiComparison = function renderComparisonWithMabatChoices() {
+      try { pendingAiFoods.forEach(ensureMabatMatches); } catch (_) {}
+      originalRenderAiComparison();
+      const cards = document.querySelectorAll('#aiEditBox .compare-card');
+      cards.forEach((card, foodIndex) => {
+        const item = pendingAiFoods[foodIndex];
+        if (!item || card.querySelector('.mabat-match-picker')) return;
+        const matches = ensureMabatMatches(item);
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mabat-match-picker';
+        const label = document.createElement('label');
+        label.textContent = matches.length ? `בחר התאמה מדויקת מתוך MABAT (${matches.length} אפשרויות)` : 'לא נמצאו התאמות ב־MABAT';
+        wrapper.appendChild(label);
+        if (matches.length) {
+          const select = document.createElement('select');
+          matches.forEach((food, matchIndex) => {
+            const text = `${food.name} | ${fmt(food.cal)} קל׳, חלבון ${fmt(food.p)}, פחמימה ${fmt(food.c)}, שומן ${fmt(food.f)} ל־100`;
+            select.add(new Option(text, String(matchIndex), false, food === item.mabat));
+          });
+          select.addEventListener('change', () => window.selectMabatMatch(foodIndex, select.value));
+          wrapper.appendChild(select);
+          const badge = card.querySelector('.compare-source');
+          if (badge) badge.textContent = 'נמצאו התאמות MABAT לבחירה';
+        }
+        const sourceLabel = [...card.querySelectorAll('label')].find(node => node.textContent.includes('מקור הערכים'));
+        card.insertBefore(wrapper, sourceLabel || card.querySelector('.compare-table'));
+      });
+    };
+    window.__mabatChoiceList = true;
+  }
+
   const normalizeMeal = value => {
     const raw = String(value || '').trim().toLowerCase();
     if (!raw) return 'ביניים';
