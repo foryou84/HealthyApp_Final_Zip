@@ -128,6 +128,34 @@
     window.__iosKeyboardObserver.observe(document.body, { childList: true, subtree: true });
   };
 
+  const formatMealChatAnswer = text => String(text || '')
+    .replace(/\s+(?=(?:ארוחת\s+)?(?:בוקר|צהריים|ערב|ביניים|נשנוש|סיכום)\s*:)/g, '\n')
+    .replace(/^\s+|\s+$/g, '')
+    .replace(/\n{3,}/g, '\n\n');
+
+  window.addChat = (role, text) => {
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${role === 'user' ? 'userbubble' : 'aibubble'}`;
+    bubble.textContent = role === 'user' ? String(text || '') : formatMealChatAnswer(text);
+    bubble.style.whiteSpace = 'pre-wrap';
+    bubble.style.overflowWrap = 'anywhere';
+    chatLog.appendChild(bubble);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  };
+
+  window.askCoachChat = async () => {
+    const question = chatInput.value.trim();
+    if (!question) return;
+    window.addChat('user', question);
+    chatInput.value = '';
+    try {
+      const answer = await callGeminiText(`ענה בעברית קצרה ומעשית לפי הנתונים:\n${buildContext()}\nשאלה: ${question}\n\nכללי תצוגה מחייבים לתשובה על תפריט או הצעת אוכל:\nבוקר: שורה אחת\nצהריים: שורה אחת\nערב: שורה אחת\nביניים: שורה אחת\nסיכום: שורה אחת\nאין לכתוב את הארוחות כפסקה רציפה. כל ארוחה חייבת להתחיל בשורה חדשה.`);
+      window.addChat('ai', answer);
+    } catch (error) {
+      window.addChat('ai', 'AI לא זמין: ' + error.message);
+    }
+  };
+
   const installNativeKeyboardControls = () => {
     const quickInput = document.getElementById('quick');
     const manualInput = document.getElementById('mName');
