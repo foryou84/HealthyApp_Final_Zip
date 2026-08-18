@@ -124,7 +124,7 @@
       button.addEventListener('click', () => window.focusIphoneKeyboard(manualInput));
       manualInput.insertAdjacentElement('afterend', button);
       const fallback = manualInput.parentElement?.querySelector('button:not(#nativeManualKeyboard)');
-      if (fallback) fallback.textContent = '⌨️ מקלדת האפליקציה - גיבוי';
+      if (fallback) fallback.textContent = '✏️ ערוך שם במקלדת iPhone';
     }
   };
 
