@@ -35,13 +35,17 @@
     window.betterScoreFood = function specificFoodScore(query, food) {
       const baseScore = originalFoodScore(query, food);
       if (baseScore < 0 || !food) return baseScore;
-      const queryWords = cleanFoodText(query).split(/\s+/).filter(Boolean).map(foodToken);
+      const cleanQuery = cleanFoodText(query);
+      const queryWords = cleanQuery.split(/\s+/).filter(Boolean).map(foodToken);
       const names = [food.name, ...(food.a || [])].map(cleanFoodText);
       const nameWords = names.flatMap(name => name.split(/\s+/).filter(Boolean).map(foodToken));
       const matched = queryWords.filter(word => nameWords.includes(word));
       const normalizedExtra = Math.max(0, matched.length - Math.floor(baseScore / 350)) * 350;
       const varietyBonus = queryWords.slice(1).filter(word => nameWords.includes(word)).length * 500;
-      return baseScore + normalizedExtra + varietyBonus;
+      // Prefer the food itself ("ריבה, כל הטעמים") over a compound product
+      // that merely contains it ("עוגיות במילוי ריבה").
+      const leadingFoodBonus = names.some(name => name === cleanQuery || name.startsWith(cleanQuery + ' ')) ? 1500 : 0;
+      return baseScore + normalizedExtra + varietyBonus + leadingFoodBonus;
     };
     window.__specificFoodScoreFix = true;
   }
