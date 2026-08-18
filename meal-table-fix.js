@@ -20,6 +20,10 @@
     return rounded.toLocaleString('he-IL', { maximumFractionDigits: decimals });
   };
 
+  const escapeHtml = value => String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
   const normalizeMeal = value => {
     const raw = String(value || '').trim().toLowerCase();
     if (!raw) return 'ביניים';
@@ -55,15 +59,107 @@
     };
   };
 
+  function getState() {
+    try { if (typeof st !== 'undefined' && st) return st; } catch (_) {}
+    return window.st || null;
+  }
+
+  function sameEntriesShape(candidate, state) {
+    if (!candidate || !Array.isArray(candidate.entries) || !state || !Array.isArray(state.entries)) return false;
+    if (candidate.entries.length !== state.entries.length) return false;
+    if (!candidate.entries.length) return true;
+    const getName = e => String((e && (e.name || e.food || e.title)) || '');
+    return getName(candidate.entries[0]) === getName(state.entries[0]) &&
+      getName(candidate.entries[candidate.entries.length - 1]) === getName(state.entries[state.entries.length - 1]);
+  }
+
+  function persistToStorage(storage, state) {
+    if (!storage) return false;
+    try {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        const raw = storage.getItem(key);
+        if (!raw) continue;
+        let data;
+        try { data = JSON.parse(raw); } catch (_) { continue; }
+        if (sameEntriesShape(data, state)) {
+          storage.setItem(key, JSON.stringify(state));
+          return true;
+        }
+        for (const wrapper of ['state', 'st', 'data', 'appState']) {
+          if (data && sameEntriesShape(data[wrapper], state)) {
+            data[wrapper] = state;
+            storage.setItem(key, JSON.stringify(data));
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  function persistState(state, previousEntries) {
+    let saved = false;
+    const snapshot = Array.isArray(previousEntries) ? previousEntries : null;
+
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const raw = localStorage.getItem(key);
+        if (!raw) continue;
+        let data;
+        try { data = JSON.parse(raw); } catch (_) { continue; }
+        const candidates = [{root:data, wrapper:null}, ...['state','st','data','appState'].map(wrapper => ({root:data && data[wrapper], wrapper}))];
+        for (const candidate of candidates) {
+          const obj = candidate.root;
+          if (!obj || !Array.isArray(obj.entries)) continue;
+          const oldState = { entries: snapshot || state.entries };
+          if (!sameEntriesShape(obj, oldState)) continue;
+          if (candidate.wrapper) {
+            data[candidate.wrapper] = state;
+            localStorage.setItem(key, JSON.stringify(data));
+          } else {
+            localStorage.setItem(key, JSON.stringify(state));
+          }
+          saved = true;
+          break;
+        }
+        if (saved) break;
+      }
+    } catch (_) {}
+
+    if (!saved) saved = persistToStorage(window.sessionStorage, state);
+
+    for (const fnName of ['saveState', 'persistState', 'saveData', 'saveAppState', 'commitState']) {
+      const fn = window[fnName];
+      if (typeof fn === 'function') {
+        try { fn(); saved = true; break; } catch (_) {}
+      }
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('healthyapp:statechange', { detail: { source: 'meal-editor' } }));
+    } catch (_) {}
+    return saved;
+  }
+
   const valueCell = (value, decimals = 1) => `<td>${fmt(value, decimals)}</td>`;
 
   const detailHtml = items => {
     if (!items.length) return '<div class="meal-summary-empty">אין פריטים בארוחה זו.</div>';
-    return items.map(entry => {
+    return items.map(({ entry, index }) => {
       const n = nutrition(entry || {});
-      const amount = pick(entry.amount, entry.qty, entry.quantity);
-      const amountText = amount ? `${fmt(amount)} ${entry.unit || 'ג׳'}` : '';
-      return `<div class="meal-summary-item"><div><b>${entry.name || entry.food || 'פריט'}</b>${amountText ? `<span>${amountText}</span>` : ''}</div><div class="meal-summary-item-macros">${fmt(n.cal,0)} קל׳ | חלבון ${fmt(n.p)} | פחמימה ${fmt(n.c)} | שומן ${fmt(n.f)}${n.v ? ` | ירקות ${fmt(n.v)} ג׳` : ''}</div></div>`;
+      const amount = pick(entry.amount, entry.qty, entry.quantity, entry.grams, entry.weight);
+      const amountText = amount ? `${fmt(amount)} ${escapeHtml(entry.unit || 'ג׳')}` : '';
+      const name = escapeHtml(entry.name || entry.food || 'פריט');
+      return `<div class="meal-summary-item">
+        <div class="meal-summary-item-top"><b>${name}</b>${amountText ? `<span>${amountText}</span>` : ''}</div>
+        <div class="meal-summary-item-macros">${fmt(n.cal,0)} קל׳ | חלבון ${fmt(n.p)} | פחמימה ${fmt(n.c)} | שומן ${fmt(n.f)}${n.v ? ` | ירקות ${fmt(n.v)} ג׳` : ''}</div>
+        <div class="meal-summary-actions">
+          <button type="button" class="meal-edit-btn" onclick="event.stopPropagation();editMealEntry(${index})">✏️ ערוך כמות</button>
+          <button type="button" class="meal-delete-btn" onclick="event.stopPropagation();deleteMealEntry(${index})">🗑️ מחק</button>
+        </div>
+      </div>`;
     }).join('');
   };
 
@@ -72,10 +168,66 @@
     if (row) row.classList.toggle('hide');
   };
 
-  function getState() {
-    try { if (typeof st !== 'undefined' && st) return st; } catch (_) {}
-    return window.st || null;
+  function quantityKey(entry) {
+    return ['amount','qty','quantity','grams','weight'].find(key => entry && entry[key] !== undefined && entry[key] !== null && entry[key] !== '') || 'amount';
   }
+
+  function scaleExistingNutrition(entry, ratio) {
+    if (!Number.isFinite(ratio)) return;
+    const keys = ['cal','kcal','calories','energy','p','protein','proteinG','c','carbs','carb','carbohydrates','f','fat','fatG','v','veg','vegetables','vegetable','vegG'];
+    keys.forEach(key => {
+      if (entry[key] !== undefined && entry[key] !== null && entry[key] !== '' && Number.isFinite(num(entry[key]))) {
+        entry[key] = Math.round(num(entry[key]) * ratio * 100) / 100;
+      }
+    });
+  }
+
+  window.deleteMealEntry = index => {
+    const state = getState();
+    if (!state || !Array.isArray(state.entries) || !state.entries[index]) return;
+    const entry = state.entries[index];
+    const name = entry.name || entry.food || 'המאכל';
+    if (!window.confirm(`למחוק את "${name}" מהיום?`)) return;
+    const previousEntries = state.entries.map(item => ({ ...item }));
+    state.entries.splice(index, 1);
+    persistState(state, previousEntries);
+    lastSignature = '';
+    renderMealJournalTable(true);
+  };
+
+  window.editMealEntry = index => {
+    const state = getState();
+    if (!state || !Array.isArray(state.entries) || !state.entries[index]) return;
+    const entry = state.entries[index];
+    const key = quantityKey(entry);
+    const current = pick(entry[key]);
+    const name = entry.name || entry.food || 'המאכל';
+
+    if (!current) {
+      alert(`ל-${name} אין כמות שמורה שאפשר לשנות אוטומטית. אם לא אכלת אותו, השתמש בכפתור מחק.`);
+      return;
+    }
+
+    const answer = window.prompt(`כמות חדשה עבור ${name}:`, String(current));
+    if (answer === null) return;
+    const next = num(answer);
+    if (!(next > 0)) {
+      if (next === 0 && window.confirm('כמות 0 תמחק את המאכל. למחוק?')) {
+        window.deleteMealEntry(index);
+      } else if (next !== 0) {
+        alert('יש להזין כמות גדולה מ-0.');
+      }
+      return;
+    }
+
+    const previousEntries = state.entries.map(item => ({ ...item }));
+    const ratio = next / current;
+    entry[key] = next;
+    scaleExistingNutrition(entry, ratio);
+    persistState(state, previousEntries);
+    lastSignature = '';
+    renderMealJournalTable(true);
+  };
 
   function renderMealJournalTable(force = false) {
     const box = document.getElementById('mealJournal');
@@ -88,9 +240,10 @@
     if (!force && signature === lastSignature && box.querySelector('.meal-summary-table')) return;
     lastSignature = signature;
 
+    const indexed = entries.map((entry, index) => ({ entry, index }));
     const rows = MEALS.map(meal => {
-      const items = entries.filter(entry => normalizeMeal(entry && (entry.meal ?? entry.mealType ?? entry.mealName ?? entry.category)) === meal);
-      return { meal, items, total: sumEntries(items) };
+      const items = indexed.filter(({entry}) => normalizeMeal(entry && (entry.meal ?? entry.mealType ?? entry.mealName ?? entry.category)) === meal);
+      return { meal, items, total: sumEntries(items.map(item => item.entry)) };
     });
 
     const total = sumEntries(entries);
@@ -109,14 +262,14 @@
       return `<tr class="meal-summary-meal-row" onclick="toggleMealSummaryDetail('${id}')"><th scope="row">${row.meal}<span>⌄</span></th>${valueCell(row.total.cal,0)}${valueCell(row.total.p)}${valueCell(row.total.c)}${valueCell(row.total.f)}${valueCell(row.total.v)}</tr><tr id="${id}" class="meal-summary-detail hide"><td colspan="6">${detailHtml(row.items)}</td></tr>`;
     }).join('');
 
-    box.innerHTML = `<div class="meal-summary-scroll"><table class="meal-summary-table" dir="rtl"><thead><tr><th>ארוחה</th><th>קלוריות</th><th>חלבון</th><th>פחמימה</th><th>שומן</th><th>ירקות</th></tr></thead><tbody>${mealRows}${summaryRow('סה״כ היום',total,'meal-summary-total')}${summaryRow('יעד יומי',target,'meal-summary-target')}${summaryRow('נשאר',remaining,'meal-summary-remaining')}</tbody></table></div><div class="meal-summary-hint">לחץ על ארוחה כדי לראות את הפירוט.</div>`;
+    box.innerHTML = `<div class="meal-summary-scroll"><table class="meal-summary-table" dir="rtl"><thead><tr><th>ארוחה</th><th>קלוריות</th><th>חלבון</th><th>פחמימה</th><th>שומן</th><th>ירקות</th></tr></thead><tbody>${mealRows}${summaryRow('סה״כ היום',total,'meal-summary-total')}${summaryRow('יעד יומי',target,'meal-summary-target')}${summaryRow('נשאר',remaining,'meal-summary-remaining')}</tbody></table></div><div class="meal-summary-hint">לחץ על ארוחה לפירוט. ליד כל מאכל אפשר לערוך כמות או למחוק.</div>`;
   }
 
   window.renderMealJournal = () => renderMealJournalTable(true);
 
-  if (!document.getElementById('meal-summary-table-style-v2')) {
+  if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
-    style.id = 'meal-summary-table-style-v2';
+    style.id = 'meal-summary-table-style-v3';
     style.textContent = `
       #mealJournal{direction:rtl}
       .meal-summary-scroll{margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #e5e7eb;border-radius:18px;background:#fff}
@@ -128,10 +281,14 @@
       .meal-summary-meal-row{cursor:pointer}
       .meal-summary-meal-row th{display:flex;align-items:center;justify-content:space-between;gap:4px}
       .meal-summary-detail td{padding:0!important;text-align:right!important;background:#fbfdff}
-      .meal-summary-item{padding:9px 12px;border-bottom:1px solid #eef2f7}
-      .meal-summary-item>div:first-child{display:flex;justify-content:space-between;gap:10px}
+      .meal-summary-item{padding:10px 12px;border-bottom:1px solid #eef2f7;white-space:normal}
+      .meal-summary-item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+      .meal-summary-item-top b{white-space:normal;line-height:1.35}
       .meal-summary-item span,.meal-summary-item-macros,.meal-summary-empty{font-size:11px;color:#6b7280}
-      .meal-summary-item-macros{margin-top:3px}.meal-summary-empty{padding:12px;text-align:center}
+      .meal-summary-item-macros{margin-top:4px;white-space:normal;line-height:1.45}.meal-summary-empty{padding:12px;text-align:center}
+      .meal-summary-actions{display:flex;gap:8px;margin-top:8px}
+      .meal-summary-actions button{border:0;border-radius:10px;padding:7px 10px;font-size:11px;font-weight:800;cursor:pointer}
+      .meal-edit-btn{background:#eaf3ff;color:#1264c5}.meal-delete-btn{background:#fff0f0;color:#b42318}
       .meal-summary-total th,.meal-summary-total td{font-weight:900;background:#eef6ff}.meal-summary-total th:first-child{background:#eef6ff}
       .meal-summary-target th,.meal-summary-target td{font-weight:900;background:#f5f3ff}.meal-summary-target th:first-child{background:#f5f3ff}
       .meal-summary-remaining th,.meal-summary-remaining td{font-weight:900;background:#ecfdf5;border-bottom:0}.meal-summary-remaining th:first-child{background:#ecfdf5}
