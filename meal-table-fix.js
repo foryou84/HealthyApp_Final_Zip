@@ -24,6 +24,58 @@
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+  // Replace the old on-screen keyboard with a real form input. Because the
+  // input is created and focused inside the original user gesture, iOS Safari
+  // opens its native keyboard instead of the app's simulated keyboard.
+  window.openAppKeyboard = (title, value, type, onSave) => {
+    document.getElementById('nativeEditOverlay')?.remove();
+    const oldOverlay = document.getElementById('appKeyboard');
+    if (oldOverlay) oldOverlay.classList.add('hide');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'nativeEditOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:#0008;display:flex;align-items:center;justify-content:center;padding:18px';
+    const form = document.createElement('form');
+    form.dir = 'rtl';
+    form.style.cssText = 'width:min(100%,520px);background:#fff;border-radius:22px;padding:18px;box-shadow:0 20px 60px #0005';
+    const heading = document.createElement('div');
+    heading.textContent = title;
+    heading.style.cssText = 'font-size:20px;font-weight:900;margin-bottom:12px';
+    const input = document.createElement('input');
+    input.value = String(value ?? '');
+    input.type = type === 'number' ? 'text' : 'text';
+    input.inputMode = type === 'number' ? 'decimal' : 'text';
+    input.autocomplete = 'off';
+    input.enterKeyHint = 'done';
+    input.style.cssText = 'display:block;width:100%;box-sizing:border-box;font-size:22px;padding:13px;border:2px solid #93c5fd;border-radius:14px;background:#fff;color:#111827';
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'בטל';
+    cancel.style.background = '#6b7280';
+    const save = document.createElement('button');
+    save.type = 'submit';
+    save.textContent = 'אישור';
+    actions.append(cancel, save);
+    form.append(heading, input, actions);
+    overlay.appendChild(form);
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    cancel.addEventListener('click', close);
+    overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const nextValue = input.value.trim();
+      close();
+      if (typeof onSave === 'function') onSave(nextValue);
+    });
+
+    input.focus({ preventScroll: true });
+    input.select();
+  };
+
   // iOS only opens its native keyboard when focus happens synchronously inside
   // the user's tap. Keep the in-app keyboard as a fallback, but restore a
   // direct native-keyboard path for normal text and numeric inputs.
