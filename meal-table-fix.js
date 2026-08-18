@@ -111,11 +111,28 @@
   if (typeof window.renderAiComparison === 'function' && !window.__mabatChoiceList) {
     // A preparation bonus (for example "מבושל") may only reorder genuine text
     // matches. It must never introduce unrelated cooked foods into the list.
+    const coreClean = value => String(value || '').toLowerCase()
+      .replace(/["׳״'`.,:;!?()\[\]{}\/\\_-]/g, ' ').replace(/\s+/g, ' ').trim();
+    const coreFoodToken = word => ({ אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן' }[word] || word);
+    const preparationWords = new Set(['עם','בלי','ללא','של','או','ו','מבושל','מבושלים','מבושלת','מבושלות','מוכן','מוכנים','מוכנה','טרי','טריים','טריה','טריות','מטוגן','מטוגנים','מטוגנת','אפוי','אפויים','אפויה','מאודה','מאודים','מאודה','במים','מים','בשמן','שמן','מלח','קפוא','קפואים','קפואה','מסונן','מסוננת']);
+    const relevantToken = word => {
+      const normalized = coreClean(word);
+      if (preparationWords.has(normalized) || /^\d/.test(normalized)) return '';
+      if (normalized.length > 4 && normalized.endsWith('ים')) return normalized.slice(0, -2);
+      return coreFoodToken(normalized);
+    };
+    const hasCoreFoodMatch = (query, food) => {
+      const queryTokens = coreClean(query).split(/\s+/).map(relevantToken).filter(Boolean);
+      if (!queryTokens.length) return false;
+      const foodTokens = coreClean([food.name, ...(food.a || [])].join(' ')).split(/\s+/).map(relevantToken).filter(Boolean);
+      return queryTokens.some(token => foodTokens.includes(token));
+    };
     window.findMatches = function relevantMabatMatches(query, limit = 50) {
       return allFoods().map(food => {
         const lexical = betterScoreFood(query, food);
-        return { food, lexical, score: lexical > 0 ? lexical + defaultReadyFoodBonus(query, food) : lexical };
-      }).filter(result => result.lexical > 0)
+        const coreMatch = hasCoreFoodMatch(query, food);
+        return { food, lexical, coreMatch, score: coreMatch && lexical > 0 ? lexical + defaultReadyFoodBonus(query, food) : lexical };
+      }).filter(result => result.lexical > 0 && result.coreMatch)
         .sort((a, b) => b.score - a.score).slice(0, limit).map(result => result.food);
     };
     window.findFood = function relevantMabatFood(query) {
