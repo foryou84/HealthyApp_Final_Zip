@@ -306,8 +306,26 @@
     if (!input || document.getElementById('chatMediaTools')) return;
     const mediaTools = document.createElement('div');
     mediaTools.id = 'chatMediaTools';
-    mediaTools.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:9px 0"><button type="button" id="chatRecordButton" onclick="recordChatQuestion()">🎙️ הקלט שאלה</button><button type="button" onclick="document.getElementById('chatCameraInput').click()">📷 צלם מנה</button><button type="button" onclick="document.getElementById('chatGalleryInput').click()">🖼️ כמה תמונות</button></div><input id="chatCameraInput" type="file" accept="image/*" capture="environment" class="hide" onchange="addChatWeddingPhotos(event)"><input id="chatGalleryInput" type="file" accept="image/*" multiple class="hide" onchange="addChatWeddingPhotos(event)"><div id="chatPhotoPreview" class="hide" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0"></div><button type="button" id="analyzeWeddingPhotos" class="hide" onclick="analyzeWeddingPhotos()"></button><button type="button" id="clearWeddingPhotos" class="hide" style="background:#6b7280" onclick="clearWeddingPhotos()">נקה תמונות</button>`;
+    mediaTools.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:9px 0"><button type="button" id="chatRecordButton" onclick="recordChatQuestion()">🎙️ הקלט שאלה</button><button type="button" aria-label="צלם או בחר תמונות" onclick="document.getElementById('chatGalleryInput').click()">📷 צלם או בחר תמונות</button></div><input id="chatGalleryInput" type="file" accept="image/*" multiple class="hide" onchange="addChatWeddingPhotos(event)"><div id="chatPhotoPreview" class="hide" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0"></div><button type="button" id="analyzeWeddingPhotos" class="hide" onclick="analyzeWeddingPhotos()"></button><button type="button" id="clearWeddingPhotos" class="hide" style="background:#6b7280" onclick="clearWeddingPhotos()">נקה תמונות</button>`;
     input.insertAdjacentElement('afterend', mediaTools);
+  };
+
+  const installUnifiedPhotoPicker = () => {
+    const cameraInput = document.getElementById('aiCamera');
+    const galleryInput = document.getElementById('aiGallery');
+    if (!cameraInput) return;
+    cameraInput.removeAttribute('capture');
+    cameraInput.setAttribute('accept', 'image/*');
+    const quick = cameraInput.closest('.quick');
+    const cameraButton = quick?.querySelector('button[onclick*="aiCamera"]');
+    const galleryButton = quick?.querySelector('button[onclick*="aiGallery"]');
+    if (cameraButton) {
+      cameraButton.textContent = '📷';
+      cameraButton.setAttribute('aria-label', 'צלם או בחר תמונה');
+      cameraButton.title = 'צלם או בחר תמונה';
+    }
+    galleryButton?.remove();
+    galleryInput?.remove();
   };
 
   const installNativeKeyboardControls = () => {
@@ -729,8 +747,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installChatMediaTools(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installChatMediaTools(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
