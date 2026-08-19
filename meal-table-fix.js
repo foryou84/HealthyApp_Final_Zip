@@ -761,9 +761,9 @@
 
     const cupOption = [...unit.options].find(option => option.value === 'cup');
     if (cupOption) cupOption.textContent = 'כוס מדידה 240 מ״ל';
-    if (![...unit.options].some(option => option.value === 'cup200')) {
-      const cup200 = new Option('כוס שתייה 200 מ״ל', 'cup200');
-      unit.add(cup200, cupOption ? cupOption.index + 1 : undefined);
+    if (![...unit.options].some(option => option.value === 'cup180')) {
+      const cup180 = new Option('כוס שתייה מים 180 מ״ל', 'cup180');
+      unit.add(cup180, cupOption ? cupOption.index + 1 : undefined);
     }
 
     const row = document.createElement('div');
@@ -796,9 +796,9 @@
       } catch (_) {}
       return null;
     };
-    const fallbackFactor = selectedUnit => ({ tbsp: 15, tsp: 5, cup: 240, cup200: 200, unit: 1 })[selectedUnit] || 1;
+    const fallbackFactor = selectedUnit => ({ tbsp: 15, tsp: 5, cup: 240, cup180: 180, unit: 1 })[selectedUnit] || 1;
     const factorFor = selectedUnit => {
-      const lookupUnit = selectedUnit === 'cup200' ? 'cup' : selectedUnit;
+      const lookupUnit = selectedUnit === 'cup180' ? 'cup' : selectedUnit;
       const portionNames = { cup: ['כוס'], tbsp: ['כף'], tsp: ['כפית'], unit: ['יחידה'] }[lookupUnit] || [];
       let food = foodForName();
       try {
@@ -809,8 +809,8 @@
       let factor = 0;
       try {
         if (food && typeof portionWeightForFood === 'function') {
-          factor = selectedUnit === 'cup200'
-            ? num(portionWeightForFood(food, 'cup')) * (200 / 240)
+          factor = selectedUnit === 'cup180'
+            ? num(portionWeightForFood(food, 'cup')) * (180 / 240)
             : num(portionWeightForFood(food, selectedUnit));
         }
       } catch (_) {}
