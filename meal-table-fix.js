@@ -399,7 +399,12 @@
     const coreClean = value => String(value || '').toLowerCase()
       .replace(/["׳״'`.,:;!?()\[\]{}\/\\_-]/g, ' ').replace(/\s+/g, ' ').trim();
     const coreFoodToken = word => ({ אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן' }[word] || word);
-    const preparationWords = new Set(['עם','בלי','ללא','של','או','ו','מבושל','מבושלים','מבושלת','מבושלות','מוכן','מוכנים','מוכנה','טרי','טריים','טריה','טריות','מטוגן','מטוגנים','מטוגנת','אפוי','אפויים','אפויה','מאודה','מאודים','מאודה','במים','מים','בשמן','שמן','מלח','קפוא','קפואים','קפואה','מסונן','מסוננת']);
+    const preparationWords = new Set(['עם','בלי','ללא','של','או','ו','מבושל','מבושלים','מבושלת','מבושלות','מוכן','מוכנים','מוכנה','טרי','טריים','טריה','טריות','מטוגן','מטוגנים','מטוגנת','אפוי','אפויים','אפויה','מאודה','מאודים','מאודה','במים','מים','בשמן','שמן','מלח','קפוא','קפואים','קפואה','מסונן','מסוננת','אחוז','אחוזים']);
+    const percentValue = value => {
+      const text = String(value || '').toLowerCase();
+      const match = text.match(/(\d+(?:[.,]\d+)?)\s*(?:%|אחוז(?:ים)?)/);
+      return match ? Number(match[1].replace(',', '.')) : null;
+    };
     const relevantToken = word => {
       const normalized = coreClean(word);
       if (preparationWords.has(normalized) || /^\d/.test(normalized)) return '';
@@ -415,10 +420,13 @@
       return matchedCoreWords >= requiredCoreWords;
     };
     window.findMatches = function relevantMabatMatches(query, limit = 50) {
+      const requestedPercent = percentValue(query);
       return allFoods().map(food => {
         const lexical = betterScoreFood(query, food);
         const coreMatch = hasCoreFoodMatch(query, food);
-        return { food, lexical, coreMatch, score: coreMatch && lexical > 0 ? lexical + defaultReadyFoodBonus(query, food) : lexical };
+        const foodPercent = percentValue([food.name, ...(food.a || [])].join(' '));
+        const percentBonus = requestedPercent == null ? 0 : (foodPercent === requestedPercent ? 2500 : (foodPercent == null ? 0 : -1200));
+        return { food, lexical, coreMatch, score: coreMatch && lexical > 0 ? lexical + defaultReadyFoodBonus(query, food) + percentBonus : lexical };
       }).filter(result => result.lexical > 0 && result.coreMatch)
         .sort((a, b) => b.score - a.score).slice(0, limit).map(result => result.food);
     };
