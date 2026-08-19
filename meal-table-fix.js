@@ -156,6 +156,160 @@
     }
   };
 
+  let chatWeddingPhotos = [];
+  let chatVoiceRecorder = null;
+  let chatVoiceChunks = [];
+
+  const renderChatPhotoPreview = () => {
+    const box = document.getElementById('chatPhotoPreview');
+    const analyze = document.getElementById('analyzeWeddingPhotos');
+    const clear = document.getElementById('clearWeddingPhotos');
+    if (!box) return;
+    box.innerHTML = chatWeddingPhotos.map((src, index) => `<div style="position:relative"><img src="${src}" alt="תמונה ${index + 1}" style="width:100%;height:86px;object-fit:cover;border-radius:12px"><button type="button" data-photo-index="${index}" style="position:absolute;top:3px;left:3px;width:30px;height:30px;padding:0;margin:0;border-radius:50%;background:#ef4444">×</button></div>`).join('');
+    box.classList.toggle('hide', !chatWeddingPhotos.length);
+    if (analyze) {
+      analyze.classList.toggle('hide', !chatWeddingPhotos.length);
+      analyze.textContent = `🍽️ בדוק ${chatWeddingPhotos.length} תמונות עם Gemini ו-MABAT`;
+    }
+    if (clear) clear.classList.toggle('hide', !chatWeddingPhotos.length);
+    box.querySelectorAll('[data-photo-index]').forEach(button => button.addEventListener('click', () => {
+      chatWeddingPhotos.splice(Number(button.dataset.photoIndex), 1);
+      renderChatPhotoPreview();
+    }));
+  };
+
+  window.addChatWeddingPhotos = async event => {
+    const files = [...(event.target.files || [])];
+    event.target.value = '';
+    if (!files.length) return;
+    const remaining = Math.max(0, 6 - chatWeddingPhotos.length);
+    if (!remaining) {
+      window.addChat('ai', 'אפשר לבדוק עד 6 תמונות בכל פעם. בדוק או נקה את התמונות שכבר נבחרו.');
+      return;
+    }
+    try {
+      chatWeddingPhotos.push(...await Promise.all(files.slice(0, remaining).map(file => compressImage(file))));
+      renderChatPhotoPreview();
+      if (files.length > remaining) window.addChat('ai', `נבחרו ${remaining} תמונות בלבד. המגבלה היא 6 תמונות בכל בדיקה.`);
+    } catch (error) {
+      window.addChat('ai', 'לא הצלחתי לקרוא אחת התמונות: ' + error.message);
+    }
+  };
+
+  const loadChatImage = src => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+
+  const createWeddingCollage = async images => {
+    const loaded = await Promise.all(images.map(loadChatImage));
+    const columns = images.length === 1 ? 1 : 2;
+    const cellWidth = 360, cellHeight = 300;
+    const canvas = document.createElement('canvas');
+    canvas.width = cellWidth * columns;
+    canvas.height = cellHeight * Math.ceil(images.length / columns);
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    loaded.forEach((image, index) => {
+      const x = index % columns * cellWidth, y = Math.floor(index / columns) * cellHeight;
+      const scale = Math.max(cellWidth / image.width, cellHeight / image.height);
+      const width = image.width * scale, height = image.height * scale;
+      context.drawImage(image, x + (cellWidth - width) / 2, y + (cellHeight - height) / 2, width, height);
+      context.fillStyle = '#007aff';
+      context.beginPath(); context.arc(x + 25, y + 25, 18, 0, Math.PI * 2); context.fill();
+      context.fillStyle = '#fff'; context.font = 'bold 20px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText(String(index + 1), x + 25, y + 25);
+    });
+    return canvas.toDataURL('image/jpeg', .72);
+  };
+
+  window.clearWeddingPhotos = () => {
+    chatWeddingPhotos = [];
+    renderChatPhotoPreview();
+  };
+
+  window.analyzeWeddingPhotos = async () => {
+    if (!chatWeddingPhotos.length) return;
+    const button = document.getElementById('analyzeWeddingPhotos');
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Gemini מזהה ואחר כך משווה ל-MABAT...';
+    window.addChat('user', `שלחתי ${chatWeddingPhotos.length} תמונות מהאוכל בחתונה. בדוק עם Gemini ו-MABAT והצע מה וכמה לאכול.`);
+    try {
+      const collage = await createWeddingCollage(chatWeddingPhotos);
+      const detected = await requestFoodAnalysis('זהה מכל התמונות הממוספרות את כל המאכלים הזמינים. אל תניח שנאכלו. אל תכלול אותו מאכל פעמיים. הערך כמות מנה רגילה לכל מאכל.', collage);
+      const checked = detected.map(item => {
+        const match = findMatches(item.name, 1)[0] || null;
+        const amount = n(item.amount) || 100;
+        const ai = { cal:n(item.cal), p:n(item.p), c:n(item.c), f:n(item.f) };
+        const mabat = match ? foodActual(match, amount) : null;
+        return { name:item.name, amount, ai, match, mabat };
+      });
+      const comparison = checked.map(item => item.match
+        ? `${item.name}, מנה משוערת ${r(item.amount)} גרם | התאמת MABAT: ${item.match.name} | לכמות: ${r(item.mabat.cal)} קלוריות, חלבון ${r(item.mabat.p)}, פחמימה ${r(item.mabat.c)}, שומן ${r(item.mabat.f)} | Gemini: ${r(item.ai.cal)} קלוריות`
+        : `${item.name}, מנה משוערת ${r(item.amount)} גרם | לא נמצאה התאמת MABAT | Gemini: ${r(item.ai.cal)} קלוריות, חלבון ${r(item.ai.p)}, פחמימה ${r(item.ai.c)}, שומן ${r(item.ai.f)}`
+      ).join('\n');
+      const answer = await callAiBackend(`Gemini זיהה מאכלים בתמונות ולאחר מכן בוצעה השוואה ל-MABAT. השתמש בערכי MABAT כשיש התאמה, וב-Gemini רק כשאין.\n${buildContext()}\n\nמאכלים והשוואה:\n${comparison}\n\nהצע מה וכמה לאכול בחתונה כדי לאזן מול מה שכבר נאכל והיעדים שנותרו. אל תניח שהמאכלים בתמונות כבר נאכלו.\nמבנה חובה, כל סעיף בשורה חדשה:\nזוהה בתמונות:\nמומלץ לבחור: ציין כל מאכל וכמות בגרם או ביחידות\nכדאי להגביל: ציין כמות מרבית\nעדיף להימנע: רק אם נחוץ\nסדר אכילה:\nסיכום משוער: קלוריות, חלבון, פחמימה ושומן\nמקור הערכים: ציין אילו נשענו על MABAT ואילו על Gemini\nהוסף משפט קצר שהזיהוי והכמויות מהצילום הם הערכה.`, null, 'gemini');
+      window.addChat('ai', answer);
+      window.clearWeddingPhotos();
+    } catch (error) {
+      window.addChat('ai', 'ניתוח התמונות נכשל: ' + error.message);
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  };
+
+  const answerRecordedChat = async audioDataUrl => {
+    window.addChat('user', '🎙️ שלחתי שאלה קולית');
+    try {
+      const answer = await callAiBackend(`האזן לשאלה בעברית וענה עליה בקצרה לפי הנתונים:\n${buildContext()}\nאם מדובר בהמלצת אוכל, השווה למאגר MABAT באמצעות הנתונים שכבר קיימים בהקשר וציין כמויות.`, audioDataUrl, 'gemini');
+      window.addChat('ai', answer);
+    } catch (error) {
+      window.addChat('ai', 'פענוח ההקלטה נכשל: ' + error.message);
+    }
+  };
+
+  window.recordChatQuestion = async () => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const button = document.getElementById('chatRecordButton');
+    if (Recognition) {
+      const recognition = new Recognition();
+      recognition.lang = 'he-IL'; recognition.interimResults = false;
+      recognition.onstart = () => { button.textContent = '⏹️ מקשיב...'; button.style.background = '#ef4444'; };
+      recognition.onresult = event => { chatInput.value = event.results[0][0].transcript; button.textContent = '🎙️ הקלט שאלה'; button.style.background = ''; window.askCoachChat(); };
+      recognition.onerror = event => { button.textContent = '🎙️ הקלט שאלה'; button.style.background = ''; window.addChat('ai', 'הקול לא זוהה: ' + (event.error || 'שגיאה')); };
+      recognition.onend = () => { if (button.textContent.includes('מקשיב')) { button.textContent = '🎙️ הקלט שאלה'; button.style.background = ''; } };
+      try { recognition.start(); } catch (error) { window.addChat('ai', 'לא ניתן לפתוח מיקרופון: ' + error.message); }
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { window.addChat('ai', 'הדפדפן אינו מאפשר הקלטה. פתח את האתר ב-Safari.'); return; }
+    if (chatVoiceRecorder?.state === 'recording') { chatVoiceRecorder.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+      chatVoiceChunks = []; chatVoiceRecorder = new MediaRecorder(stream);
+      chatVoiceRecorder.ondataavailable = event => { if (event.data.size) chatVoiceChunks.push(event.data); };
+      chatVoiceRecorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop()); button.textContent = '🎙️ הקלט שאלה'; button.style.background = '';
+        const reader = new FileReader(); reader.onload = () => answerRecordedChat(reader.result);
+        reader.readAsDataURL(new Blob(chatVoiceChunks, { type:chatVoiceRecorder.mimeType || 'audio/mp4' }));
+      };
+      chatVoiceRecorder.start(); button.textContent = '⏹️ סיום הקלטה'; button.style.background = '#ef4444';
+    } catch (_) { window.addChat('ai', 'לא ניתנה גישה למיקרופון. אשר הרשאת מיקרופון ב-Safari ונסה שוב.'); }
+  };
+
+  const installChatMediaTools = () => {
+    const input = document.getElementById('chatInput');
+    if (!input || document.getElementById('chatMediaTools')) return;
+    const mediaTools = document.createElement('div');
+    mediaTools.id = 'chatMediaTools';
+    mediaTools.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin:9px 0"><button type="button" id="chatRecordButton" onclick="recordChatQuestion()">🎙️ הקלט שאלה</button><button type="button" onclick="document.getElementById('chatCameraInput').click()">📷 צלם מנה</button><button type="button" onclick="document.getElementById('chatGalleryInput').click()">🖼️ כמה תמונות</button></div><input id="chatCameraInput" type="file" accept="image/*" capture="environment" class="hide" onchange="addChatWeddingPhotos(event)"><input id="chatGalleryInput" type="file" accept="image/*" multiple class="hide" onchange="addChatWeddingPhotos(event)"><div id="chatPhotoPreview" class="hide" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0"></div><button type="button" id="analyzeWeddingPhotos" class="hide" onclick="analyzeWeddingPhotos()"></button><button type="button" id="clearWeddingPhotos" class="hide" style="background:#6b7280" onclick="clearWeddingPhotos()">נקה תמונות</button>`;
+    input.insertAdjacentElement('afterend', mediaTools);
+  };
+
   const installNativeKeyboardControls = () => {
     const quickInput = document.getElementById('quick');
     const manualInput = document.getElementById('mName');
@@ -575,8 +729,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installChatMediaTools(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installChatMediaTools(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
