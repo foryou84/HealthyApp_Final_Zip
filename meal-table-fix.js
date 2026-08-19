@@ -759,6 +759,13 @@
     const unitWrap = unit.parentElement;
     if (!manualTop || !amountWrap || !unitWrap) return;
 
+    const cupOption = [...unit.options].find(option => option.value === 'cup');
+    if (cupOption) cupOption.textContent = 'כוס מדידה 240 מ״ל';
+    if (![...unit.options].some(option => option.value === 'cup200')) {
+      const cup200 = new Option('כוס שתייה 200 מ״ל', 'cup200');
+      unit.add(cup200, cupOption ? cupOption.index + 1 : undefined);
+    }
+
     const row = document.createElement('div');
     row.id = 'manualQuantityRow';
     const conversionWrap = document.createElement('div');
@@ -789,12 +796,23 @@
       } catch (_) {}
       return null;
     };
-    const fallbackFactor = selectedUnit => ({ tbsp: 15, tsp: 5, cup: 240, unit: 1 })[selectedUnit] || 1;
+    const fallbackFactor = selectedUnit => ({ tbsp: 15, tsp: 5, cup: 240, cup200: 200, unit: 1 })[selectedUnit] || 1;
     const factorFor = selectedUnit => {
-      const food = foodForName();
+      const lookupUnit = selectedUnit === 'cup200' ? 'cup' : selectedUnit;
+      const portionNames = { cup: ['כוס'], tbsp: ['כף'], tsp: ['כפית'], unit: ['יחידה'] }[lookupUnit] || [];
+      let food = foodForName();
+      try {
+        const candidates = typeof findMatches === 'function' ? findMatches(name.value, 50) : [];
+        const exactMabatPortion = candidates.find(candidate => candidate?.src === 'MABAT' && Object.keys(candidate.portions || {}).some(key => portionNames.includes(key)));
+        if (exactMabatPortion) food = exactMabatPortion;
+      } catch (_) {}
       let factor = 0;
       try {
-        if (food && typeof portionWeightForFood === 'function') factor = num(portionWeightForFood(food, selectedUnit));
+        if (food && typeof portionWeightForFood === 'function') {
+          factor = selectedUnit === 'cup200'
+            ? num(portionWeightForFood(food, 'cup')) * (200 / 240)
+            : num(portionWeightForFood(food, selectedUnit));
+        }
       } catch (_) {}
       if (!factor && rememberedFactors[selectedUnit]) factor = rememberedFactors[selectedUnit];
       if (!factor && selectedUnit === unit.value && unit.value !== 'g') factor = num(gramFactor.value);
