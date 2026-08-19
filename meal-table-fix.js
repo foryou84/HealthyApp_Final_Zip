@@ -715,6 +715,92 @@
 
   window.renderMealJournal = () => renderMealJournalTable(true);
 
+  function installManualConversionLayout() {
+    const amount = document.getElementById('mAmount');
+    const unit = document.getElementById('mUnit');
+    const name = document.getElementById('mName');
+    const gramFactor = document.getElementById('mGramPerUnit');
+    const nutrients = document.querySelector('.manual-nutrients');
+    if (!amount || !unit || !name || !gramFactor || document.getElementById('manualQuantityRow')) return;
+
+    const manualTop = amount.closest('.manual-top') || amount.parentElement?.parentElement;
+    const amountWrap = amount.parentElement;
+    const unitWrap = unit.parentElement;
+    if (!manualTop || !amountWrap || !unitWrap) return;
+
+    const row = document.createElement('div');
+    row.id = 'manualQuantityRow';
+    const conversionWrap = document.createElement('div');
+    conversionWrap.className = 'manual-conversion-wrap';
+    conversionWrap.innerHTML = '<label>המרה</label><output id="manualConversionDisplay" aria-live="polite">—</output>';
+    row.append(amountWrap, unitWrap, conversionWrap);
+    manualTop.appendChild(row);
+
+    // Keep the original per-unit factor for the existing nutrition calculation,
+    // but replace its editable field with a clear two-way conversion display.
+    const oldFactorWrap = gramFactor.parentElement;
+    if (oldFactorWrap) oldFactorWrap.style.display = 'none';
+
+    if (nutrients && !document.getElementById('manualNutrientsAdvanced')) {
+      const details = document.createElement('details');
+      details.id = 'manualNutrientsAdvanced';
+      const summary = document.createElement('summary');
+      summary.textContent = 'ערכים תזונתיים ל־100 — מתקדם';
+      nutrients.parentNode.insertBefore(details, nutrients);
+      details.append(summary, nutrients);
+    }
+
+    const rememberedFactors = {};
+    const foodForName = () => {
+      try {
+        if (typeof findFood === 'function') return findFood(name.value);
+        if (typeof findMatches === 'function') return findMatches(name.value, 1)?.[0] || null;
+      } catch (_) {}
+      return null;
+    };
+    const fallbackFactor = selectedUnit => ({ tbsp: 15, tsp: 5, cup: 240, unit: 1 })[selectedUnit] || 1;
+    const factorFor = selectedUnit => {
+      const food = foodForName();
+      let factor = 0;
+      try {
+        if (food && typeof portionWeightForFood === 'function') factor = num(portionWeightForFood(food, selectedUnit));
+      } catch (_) {}
+      if (!factor && rememberedFactors[selectedUnit]) factor = rememberedFactors[selectedUnit];
+      if (!factor && selectedUnit === unit.value && unit.value !== 'g') factor = num(gramFactor.value);
+      factor = factor || fallbackFactor(selectedUnit);
+      rememberedFactors[selectedUnit] = factor;
+      return factor;
+    };
+    const displayNumber = value => fmt(value, Number.isInteger(num(value)) ? 0 : 1);
+    const syncConversion = () => {
+      const output = document.getElementById('manualConversionDisplay');
+      if (!output) return;
+      const quantity = num(amount.value);
+      if (!(quantity > 0)) { output.textContent = '—'; return; }
+      if (unit.value === 'g') {
+        const tbsp = factorFor('tbsp') || 15;
+        output.textContent = `${displayNumber(quantity / tbsp)} כפות`;
+        output.title = `לפי ${displayNumber(tbsp)} גרם לכף עבור המאכל הנבחר`;
+      } else {
+        const factor = factorFor(unit.value);
+        gramFactor.value = factor;
+        output.textContent = `${displayNumber(quantity * factor)} גרם/מ״ל`;
+        output.title = `לפי ${displayNumber(factor)} גרם/מ״ל ליחידה עבור המאכל הנבחר`;
+      }
+    };
+
+    amount.addEventListener('input', syncConversion);
+    unit.addEventListener('change', () => { syncConversion(); try { window.manualPreview?.(); } catch (_) {} });
+    name.addEventListener('input', syncConversion);
+    name.addEventListener('change', syncConversion);
+    gramFactor.addEventListener('input', () => {
+      if (unit.value !== 'g' && num(gramFactor.value) > 0) rememberedFactors[unit.value] = num(gramFactor.value);
+      syncConversion();
+    });
+    setInterval(syncConversion, 1200);
+    syncConversion();
+  }
+
   if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
     style.id = 'meal-summary-table-style-v3';
@@ -742,13 +828,20 @@
       .meal-summary-remaining th,.meal-summary-remaining td{font-weight:900;background:#ecfdf5;border-bottom:0}.meal-summary-remaining th:first-child{background:#ecfdf5}
       .meal-summary-hint{font-size:11px;color:#6b7280;text-align:center;margin-top:7px}
       @media(max-width:520px){.meal-summary-table{min-width:500px;font-size:11px}.meal-summary-table th,.meal-summary-table td{padding:9px 4px}}
+      #manualQuantityRow{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:8px;align-items:end}
+      #manualQuantityRow>div{min-width:0}#manualQuantityRow label{display:block}
+      #manualConversionDisplay{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;min-height:48px;padding:10px 6px;border:1px solid #d9dee8;border-radius:14px;background:#eef6ff;color:#075fb5;font-size:17px;font-weight:900;white-space:nowrap}
+      #manualNutrientsAdvanced{margin-top:10px;border:1px solid #dce7f5;border-radius:14px;background:#f8fbff;padding:0 10px 10px}
+      #manualNutrientsAdvanced>summary{cursor:pointer;padding:11px 3px 1px;color:#586579;font-weight:800;font-size:13px}
+      #manualNutrientsAdvanced:not([open]){padding-bottom:0}#manualNutrientsAdvanced .manual-nutrients{margin-top:9px}
+      @media(max-width:520px){#manualQuantityRow{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}#manualQuantityRow input,#manualQuantityRow select{padding-left:5px!important;padding-right:5px!important;font-size:16px!important}#manualConversionDisplay{font-size:14px;min-height:46px;padding:8px 3px}}
     `;
     document.head.appendChild(style);
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
