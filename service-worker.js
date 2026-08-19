@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v28-percent-matching';
+const CACHE_NAME='healthy-app-v29-apple-health-steps';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -27,7 +27,7 @@ async function htmlWithMealTable(request){
 
   let html=await response.text();
   if(!html.includes('meal-table-fix.js')){
-    const tag='<script src="./meal-table-fix.js?v=20260819-7"></script>';
+    const tag='<script src="./meal-table-fix.js?v=20260819-8"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
   }
 
