@@ -446,7 +446,15 @@
       const cards = document.querySelectorAll('#aiEditBox .compare-card');
       cards.forEach((card, foodIndex) => {
         const item = pendingAiFoods[foodIndex];
-        if (!item || card.querySelector('.mabat-match-picker')) return;
+        if (!item) return;
+        if (item.mabat) {
+          const sourceLabel = [...card.querySelectorAll('label')].find(node => node.textContent.includes('מקור הערכים'));
+          const sourceSelect = sourceLabel?.nextElementSibling;
+          sourceSelect?.querySelector('option[value="gemini"]')?.remove();
+          const tableHeaders = card.querySelectorAll('.compare-table th');
+          if (tableHeaders[1]) tableHeaders[1].textContent = 'Gemini - הערכה בלבד';
+        }
+        if (card.querySelector('.mabat-match-picker')) return;
         const matches = ensureMabatMatches(item);
         const wrapper = document.createElement('div');
         wrapper.className = 'mabat-match-picker';
@@ -469,6 +477,29 @@
       });
     };
     window.__mabatChoiceList = true;
+  }
+
+  // Gemini identifies the dish and estimates its quantity. Whenever MABAT has
+  // a relevant match, MABAT is the default nutrition source, even when an old
+  // Gemini-derived value was approved in a previous session.
+  if (typeof window.prepareAiComparison === 'function' && !window.__mabatFirstComparison) {
+    const originalPrepareAiComparison = window.prepareAiComparison;
+    window.prepareAiComparison = function prepareMabatFirst(items, photo = '') {
+      originalPrepareAiComparison(items, photo);
+      try {
+        pendingAiFoods.forEach(item => {
+          if (!Array.isArray(item.mabatMatches)) item.mabatMatches = typeof findMatches === 'function' ? findMatches(item.aiName, 50) : [];
+          if (!item.mabat && item.mabatMatches.length) item.mabat = item.mabatMatches[0];
+          if (item.mabat) item.choice = 'mabat';
+          else if (item.approved) item.choice = 'approved';
+          else item.choice = 'gemini';
+        });
+        window.renderAiComparison();
+        const intro = document.querySelector('#aiEditBox > .small');
+        if (intro) intro.textContent = 'Gemini מזהה את המאכל והכמות. הערכים התזונתיים נלקחים מ-MABAT כשיש התאמה. בחר את פריט MABAT המדויק ורק אז אשר.';
+      } catch (_) {}
+    };
+    window.__mabatFirstComparison = true;
   }
 
   const normalizeMeal = value => {
