@@ -869,7 +869,7 @@
     const syncButton = document.createElement('button');
     syncButton.id = 'appleHealthStepsButton';
     syncButton.type = 'button';
-    syncButton.textContent = '❤️ סנכרן צעדים מ-Apple Health';
+    syncButton.textContent = '❤️ סנכרן נתונים מ-Apple Health';
     syncButton.style.cssText = 'width:100%;margin-top:9px;background:#ef4444';
     syncButton.addEventListener('click', () => {
       document.getElementById('appleHealthStepsHelp')?.classList.toggle('hide');
@@ -880,34 +880,89 @@
     help.className = 'notice hide';
     help.dir = 'rtl';
     help.style.cssText = 'margin-top:8px;text-align:right;line-height:1.55';
-    help.innerHTML = `<b>חיבור חד-פעמי באמצעות קיצורים באייפון</b><ol style="padding-right:20px;margin:8px 0">
-      <li>פתח את היישום <b>קיצורים</b> וצור קיצור חדש בשם <b>סנכרון צעדים</b>.</li>
-      <li>הוסף <b>מצא דגימות בריאות</b>: סוג = צעדים, תאריך התחלה = היום.</li>
-      <li>הוסף <b>קבל פרטים מדגימות בריאות</b> ובחר <b>ערך</b>.</li>
-      <li>הוסף <b>חשב סטטיסטיקה</b> ובחר <b>סכום</b>.</li>
-      <li>הוסף פעולת <b>טקסט</b>: <code dir="ltr">https://healthy-app-final-zip.vercel.app/#healthSteps=</code> ולאחר סימן השווי הוסף את משתנה הסכום.</li>
-      <li>הוסף <b>פתח כתובות URL</b>. בהפעלה הראשונה אשר לקיצור לקרוא צעדים.</li>
-    </ol><div class="small">הסנכרון מחליף את צעדי היום במספר העדכני מ-Apple Health ואינו מוסיף אותם פעמיים.</div>`;
+    help.innerHTML = `<b>חיבור באמצעות קיצור אחד באייפון</b><div style="margin-top:7px">הקיצור יכול להעביר צעדים, מרחק, קלוריות פעילות, דקות אימון, דופק במנוחה, משקל, אחוז שומן ושינה.</div><div class="small" style="margin-top:7px">לפני השמירה יוצג מסך השוואה ואישור. סנכרון נוסף באותו יום מחליף את המדידה הקודמת ואינו מוסיף אותה פעמיים.</div>`;
     card.insertBefore(syncButton, grid.nextSibling);
     card.insertBefore(help, syncButton.nextSibling);
 
     const params = new URLSearchParams(location.hash.replace(/^#/, ''));
-    const imported = Math.round(num(params.get('healthSteps')));
-    if (imported >= 0 && params.has('healthSteps')) {
-      try {
-        st.steps = imported;
-        if (typeof save === 'function') save();
-        if (typeof render === 'function') render();
-        const status = document.createElement('div');
-        status.className = 'notice ok';
-        status.style.marginTop = '8px';
-        status.textContent = `סונכרנו ${fmt(imported, 0)} צעדים מ-Apple Health ✓`;
-        card.insertBefore(status, syncButton);
-        setTimeout(() => status.remove(), 8000);
-        history.replaceState(null, document.title, location.pathname + location.search);
-      } catch (error) {
-        console.error('Apple Health steps import failed', error);
+    const metricDefs = [
+      ['healthSteps', 'steps', 'צעדים', 'צעדים', 0],
+      ['healthDistanceKm', 'distanceKm', 'מרחק הליכה וריצה', 'ק״מ', 2],
+      ['healthActiveCalories', 'activeCalories', 'קלוריות פעילות', 'קל׳', 0],
+      ['healthExerciseMinutes', 'exerciseMinutes', 'דקות אימון', 'דקות', 0],
+      ['healthRestingHeartRate', 'restingHeartRate', 'דופק במנוחה', 'פעימות/דקה', 0],
+      ['healthWeightKg', 'weightKg', 'משקל', 'ק״ג', 1],
+      ['healthBodyFatPercent', 'bodyFatPercent', 'אחוז שומן', '%', 1],
+      ['healthSleepHours', 'sleepHours', 'שינה', 'שעות', 2]
+    ];
+    const imported = {};
+    metricDefs.forEach(([param, key]) => {
+      if (!params.has(param)) return;
+      const raw = String(params.get(param) || '').replace(',', '.');
+      const match = raw.match(/-?\d+(?:\.\d+)?/);
+      if (match && Number.isFinite(Number(match[0]))) imported[key] = Number(match[0]);
+    });
+
+    const renderHealthSummary = () => {
+      const day = st.healthDaily?.[st.dateKey || ''] || {};
+      let summary = document.getElementById('appleHealthDailySummary');
+      if (!Object.keys(day).some(key => key !== 'syncedAt')) {
+        summary?.remove();
+        return;
       }
+      if (!summary) {
+        summary = document.createElement('div');
+        summary.id = 'appleHealthDailySummary';
+        summary.className = 'notice';
+        summary.style.cssText = 'margin-top:9px;text-align:right;line-height:1.7';
+        card.appendChild(summary);
+      }
+      const rows = metricDefs.filter(([, key]) => day[key] !== undefined).map(([, key, label, unit, decimals]) => `<div><b>${label}:</b> ${fmt(day[key], decimals)} ${unit}</div>`).join('');
+      summary.innerHTML = `<b>נתוני Apple Health שנשמרו להיום</b>${rows}`;
+    };
+
+    renderHealthSummary();
+    if (Object.keys(imported).length) {
+      history.replaceState(null, document.title, location.pathname + location.search);
+      const overlay = document.createElement('div');
+      overlay.id = 'appleHealthImportPreview';
+      overlay.dir = 'rtl';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:12000;background:#0009;display:flex;align-items:center;justify-content:center;padding:16px';
+      const previous = st.healthDaily?.[st.dateKey || ''] || {};
+      const rows = metricDefs.filter(([, key]) => imported[key] !== undefined).map(([, key, label, unit, decimals]) => {
+        const oldValue = previous[key];
+        return `<tr><th>${label}</th><td>${oldValue === undefined ? '--' : `${fmt(oldValue, decimals)} ${unit}`}</td><td><b>${fmt(imported[key], decimals)} ${unit}</b></td></tr>`;
+      }).join('');
+      overlay.innerHTML = `<div style="width:min(100%,560px);max-height:88vh;overflow:auto;background:#fff;border-radius:22px;padding:18px;box-shadow:0 20px 60px #0005"><h2 style="margin:0 0 8px">בדיקת נתוני Apple Health</h2><div class="small">בדוק את הנתונים לפני השמירה. ערך חדש יחליף את הערך הקודם לאותו יום.</div><table style="width:100%;border-collapse:collapse;margin-top:12px"><thead><tr><th style="text-align:right;padding:8px;border-bottom:1px solid #ddd">מדד</th><th style="padding:8px;border-bottom:1px solid #ddd">קודם</th><th style="padding:8px;border-bottom:1px solid #ddd">חדש</th></tr></thead><tbody>${rows}</tbody></table><div style="display:grid;grid-template-columns:1fr 2fr;gap:9px;margin-top:14px"><button type="button" id="cancelAppleHealthImport" style="background:#6b7280">בטל</button><button type="button" id="confirmAppleHealthImport">אשר ושמור</button></div></div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelectorAll('td,th').forEach(cell => { cell.style.padding = '9px 5px'; cell.style.borderBottom = '1px solid #eee'; });
+      document.getElementById('cancelAppleHealthImport').onclick = () => overlay.remove();
+      document.getElementById('confirmAppleHealthImport').onclick = () => {
+        try {
+          const dayKey = st.dateKey || new Date().toLocaleDateString('en-CA');
+          st.healthDaily = st.healthDaily || {};
+          st.healthDaily[dayKey] = { ...(st.healthDaily[dayKey] || {}), ...imported, syncedAt: new Date().toISOString() };
+          if (imported.steps !== undefined) st.steps = Math.max(0, Math.round(imported.steps));
+          if (imported.weightKg !== undefined && imported.weightKg > 0) {
+            st.profile = st.profile || {};
+            st.profile.weight = imported.weightKg;
+            const weightInput = document.getElementById('weight');
+            if (weightInput) weightInput.value = imported.weightKg;
+          }
+          if (typeof save === 'function') save();
+          if (typeof render === 'function') render();
+          overlay.remove();
+          renderHealthSummary();
+          const status = document.createElement('div');
+          status.className = 'notice ok';
+          status.style.marginTop = '8px';
+          status.textContent = `נשמרו ${Object.keys(imported).length} מדדים מ-Apple Health ✓`;
+          card.insertBefore(status, syncButton);
+          setTimeout(() => status.remove(), 8000);
+        } catch (error) {
+          console.error('Apple Health import failed', error);
+        }
+      };
     }
   }
 
