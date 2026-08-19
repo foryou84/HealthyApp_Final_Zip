@@ -858,6 +858,59 @@
     syncConversion();
   }
 
+  function installAppleHealthStepsBridge() {
+    const input = document.getElementById('trackSteps');
+    const display = document.getElementById('stepsDisp');
+    if (!input || !display || document.getElementById('appleHealthStepsButton')) return;
+    const card = input.closest('.card');
+    const grid = input.parentElement;
+    if (!card || !grid) return;
+
+    const syncButton = document.createElement('button');
+    syncButton.id = 'appleHealthStepsButton';
+    syncButton.type = 'button';
+    syncButton.textContent = '❤️ סנכרן צעדים מ-Apple Health';
+    syncButton.style.cssText = 'width:100%;margin-top:9px;background:#ef4444';
+    syncButton.addEventListener('click', () => {
+      document.getElementById('appleHealthStepsHelp')?.classList.toggle('hide');
+    });
+
+    const help = document.createElement('div');
+    help.id = 'appleHealthStepsHelp';
+    help.className = 'notice hide';
+    help.dir = 'rtl';
+    help.style.cssText = 'margin-top:8px;text-align:right;line-height:1.55';
+    help.innerHTML = `<b>חיבור חד-פעמי באמצעות קיצורים באייפון</b><ol style="padding-right:20px;margin:8px 0">
+      <li>פתח את היישום <b>קיצורים</b> וצור קיצור חדש בשם <b>סנכרון צעדים</b>.</li>
+      <li>הוסף <b>מצא דגימות בריאות</b>: סוג = צעדים, תאריך התחלה = היום.</li>
+      <li>הוסף <b>קבל פרטים מדגימות בריאות</b> ובחר <b>ערך</b>.</li>
+      <li>הוסף <b>חשב סטטיסטיקה</b> ובחר <b>סכום</b>.</li>
+      <li>הוסף פעולת <b>טקסט</b>: <code dir="ltr">https://healthy-app-final-zip.vercel.app/#healthSteps=</code> ולאחר סימן השווי הוסף את משתנה הסכום.</li>
+      <li>הוסף <b>פתח כתובות URL</b>. בהפעלה הראשונה אשר לקיצור לקרוא צעדים.</li>
+    </ol><div class="small">הסנכרון מחליף את צעדי היום במספר העדכני מ-Apple Health ואינו מוסיף אותם פעמיים.</div>`;
+    card.insertBefore(syncButton, grid.nextSibling);
+    card.insertBefore(help, syncButton.nextSibling);
+
+    const params = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const imported = Math.round(num(params.get('healthSteps')));
+    if (imported >= 0 && params.has('healthSteps')) {
+      try {
+        st.steps = imported;
+        if (typeof save === 'function') save();
+        if (typeof render === 'function') render();
+        const status = document.createElement('div');
+        status.className = 'notice ok';
+        status.style.marginTop = '8px';
+        status.textContent = `סונכרנו ${fmt(imported, 0)} צעדים מ-Apple Health ✓`;
+        card.insertBefore(status, syncButton);
+        setTimeout(() => status.remove(), 8000);
+        history.replaceState(null, document.title, location.pathname + location.search);
+      } catch (error) {
+        console.error('Apple Health steps import failed', error);
+      }
+    }
+  }
+
   if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
     style.id = 'meal-summary-table-style-v3';
@@ -897,8 +950,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
