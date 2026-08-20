@@ -1050,6 +1050,68 @@
     if (explanation) explanation.textContent = 'שמור את הארוחה הנוכחית. אם עדיין לא הוספת אותה ליומן, המאכל שמוצג במחשבון יישמר כארוחה קבועה.';
   }
 
+  function installAiMealTargetPicker() {
+    if (window.__aiMealTargetPicker || typeof window.renderAiComparison !== 'function' || typeof window.confirmAiFoods !== 'function') return;
+
+    let targetMeal = MEALS.includes(st.currentMeal) ? st.currentMeal : 'בוקר';
+    const originalPrepare = typeof window.prepareAiComparison === 'function' ? window.prepareAiComparison : null;
+    const originalRender = window.renderAiComparison;
+    const originalConfirm = window.confirmAiFoods;
+
+    if (originalPrepare) {
+      window.prepareAiComparison = function prepareComparisonWithMealTarget(...args) {
+        targetMeal = MEALS.includes(st.currentMeal) ? st.currentMeal : 'בוקר';
+        return originalPrepare.apply(this, args);
+      };
+    }
+
+    window.setAiTargetMeal = meal => {
+      if (!MEALS.includes(meal)) return;
+      targetMeal = meal;
+      const button = document.getElementById('confirmAiFoodsButton');
+      if (button) button.textContent = `אשר והוסף ל-${targetMeal}`;
+    };
+
+    window.renderAiComparison = function renderComparisonWithMealTarget(...args) {
+      const result = originalRender.apply(this, args);
+      const actions = document.querySelector('#aiEditBox .compare-actions');
+      if (!actions) return result;
+
+      const confirmButton = actions.querySelector('button');
+      if (confirmButton) {
+        confirmButton.id = 'confirmAiFoodsButton';
+        confirmButton.textContent = `אשר והוסף ל-${targetMeal}`;
+      }
+
+      if (!document.getElementById('aiMealTargetPicker')) {
+        const picker = document.createElement('div');
+        picker.id = 'aiMealTargetPicker';
+        picker.style.cssText = 'grid-column:1/-1;text-align:right;margin-bottom:2px';
+        const label = document.createElement('label');
+        label.htmlFor = 'aiMealTargetSelect';
+        label.textContent = 'לאיזו ארוחה להוסיף?';
+        label.style.cssText = 'display:block;font-weight:900;margin:0 0 6px';
+        const select = document.createElement('select');
+        select.id = 'aiMealTargetSelect';
+        select.style.cssText = 'width:100%;font-size:18px;font-weight:800';
+        MEALS.forEach(meal => select.add(new Option(meal, meal, false, meal === targetMeal)));
+        select.addEventListener('change', () => window.setAiTargetMeal(select.value));
+        picker.append(label, select);
+        actions.prepend(picker);
+      }
+      return result;
+    };
+
+    window.confirmAiFoods = function confirmFoodsInSelectedMeal(...args) {
+      st.currentMeal = targetMeal;
+      const result = originalConfirm.apply(this, args);
+      if (typeof save === 'function') save();
+      return result;
+    };
+
+    window.__aiMealTargetPicker = true;
+  }
+
   if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
     style.id = 'meal-summary-table-style-v3';
@@ -1089,8 +1151,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
