@@ -435,6 +435,13 @@
     };
     const originalRenderAiComparison = window.renderAiComparison;
     const ensureMabatMatches = item => {
+      if (item?.fromLabel) {
+        item.mabatMatches = [];
+        item.mabat = null;
+        item.approved = null;
+        item.choice = 'gemini';
+        return item.mabatMatches;
+      }
       if (!Array.isArray(item.mabatMatches)) item.mabatMatches = typeof findMatches === 'function' ? findMatches(item.aiName, 50) : [];
       if (!item.mabat && item.mabatMatches.length) item.mabat = item.mabatMatches[0];
       return item.mabatMatches;
@@ -455,6 +462,27 @@
       cards.forEach((card, foodIndex) => {
         const item = pendingAiFoods[foodIndex];
         if (!item) return;
+        if (item.fromLabel) {
+          const badge = card.querySelector('.compare-source');
+          if (badge) badge.textContent = 'ערכי תווית היצרן';
+          const sourceSelect = [...card.querySelectorAll('label')].find(node => node.textContent.includes('מקור הערכים'))?.nextElementSibling;
+          const labelOption = sourceSelect?.querySelector('option[value="gemini"]');
+          if (labelOption) labelOption.textContent = 'תווית היצרן';
+          const tableHeaders = card.querySelectorAll('.compare-table th');
+          if (tableHeaders[1]) tableHeaders[1].textContent = 'תווית היצרן';
+          card.querySelectorAll('.compare-table tr').forEach(row => {
+            [...row.children].forEach((cell, cellIndex) => {
+              if (cellIndex > 1) cell.remove();
+            });
+          });
+          [...card.querySelectorAll('.small')].forEach(node => {
+            if (node.textContent.includes('MABAT') || node.textContent.includes('התאמת מאגר')) node.remove();
+          });
+          [...card.querySelectorAll('label')].forEach(label => {
+            if (label.textContent.includes('מקור הערכים')) label.textContent = 'הערכים שיישמרו';
+          });
+          return;
+        }
         if (item.mabat) {
           const sourceLabel = [...card.querySelectorAll('label')].find(node => node.textContent.includes('מקור הערכים'));
           const sourceSelect = sourceLabel?.nextElementSibling;
@@ -1112,6 +1140,133 @@
     window.__aiMealTargetPicker = true;
   }
 
+  function installNutritionLabelScanner() {
+    if (window.__nutritionLabelScanner) return;
+
+    const fileToImage = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      const image = new Image();
+      reader.onerror = reject;
+      image.onerror = reject;
+      reader.onload = () => { image.src = reader.result; };
+      image.onload = () => resolve(image);
+      reader.readAsDataURL(file);
+    });
+
+    const makeLabelContactSheet = async files => {
+      const images = await Promise.all(files.map(fileToImage));
+      const width = 900;
+      const sectionHeight = Math.max(360, Math.floor(1500 / Math.max(1, images.length)));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = sectionHeight * images.length;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      images.forEach((image, index) => {
+        const scale = Math.min(width / image.width, sectionHeight / image.height);
+        const drawWidth = image.width * scale;
+        const drawHeight = image.height * scale;
+        const x = (width - drawWidth) / 2;
+        const y = index * sectionHeight + (sectionHeight - drawHeight) / 2;
+        context.drawImage(image, x, y, drawWidth, drawHeight);
+      });
+      return canvas.toDataURL('image/jpeg', 0.82);
+    };
+
+    window.scanNutritionLabel = async event => {
+      const input = event.target;
+      const files = [...(input.files || [])].slice(0, 4);
+      if (!files.length) return;
+      const origin = input.dataset.origin || 'food';
+      const chatNotice = text => {
+        if (origin === 'chat' && typeof window.addChat === 'function') window.addChat('ai', text);
+        else if (typeof msg === 'function') msg(text, 'ok');
+      };
+      chatNotice('קורא את שם המוצר, משקל האריזה והטבלה התזונתית...');
+      try {
+        const imageData = await makeLabelContactSheet(files);
+        const prompt = `קרא את כל צילומי תווית המזון של אותו מוצר. חלץ רק נתונים שמודפסים בבירור על האריזה. החזר JSON חוקי בלבד ללא markdown בפורמט:
+[{"name":"שם המוצר המדויק","amount":משקל_נטו_בגרם_או_מל,"unit":"g","cal":קלוריות_לכל_האריזה,"p":חלבון_לכל_האריזה,"c":פחמימות_לכל_האריזה,"f":שומן_לכל_האריזה,"v":0}]
+כללים:
+1. אם הטבלה היא ל-100 גרם או 100 מ״ל, חשב את הערכים לכל משקל האריזה.
+2. אם לא נמצא משקל נטו, השתמש ב-100 ככמות והחזר ערכים ל-100.
+3. אל תנחש ערכים שלא נראים בתווית. אם הטבלה חסרה או אינה קריאה, החזר שגיאה באמצעות JSON: [{"error":"צריך צילום ברור של טבלת הערכים"}].
+4. פחמימות הן הערך הכולל של פחמימות, לא רק סוכרים. שומן הוא סך השומן. חלבון הוא חלבונים.`;
+        const output = await callAiBackend(prompt, imageData, 'gemini');
+        const parsed = typeof parseAiJson === 'function' ? parseAiJson(output) : JSON.parse(String(output).replace(/```json|```/g, '').trim());
+        const items = Array.isArray(parsed) ? parsed : [parsed];
+        const error = items.find(item => item?.error)?.error;
+        if (error) throw new Error(error);
+        if (!items.length || items.some(item => !item?.name || num(item.amount) <= 0)) throw new Error('לא נמצאו נתוני תווית מלאים');
+        if (origin === 'chat' && typeof show === 'function') show('Food');
+        prepareAiComparison(items, imageData);
+        pendingAiFoods.forEach(item => {
+          item.fromLabel = true;
+          item.mabatMatches = [];
+          item.mabat = null;
+          item.approved = null;
+          item.choice = 'gemini';
+        });
+        window.renderAiComparison();
+        const intro = document.querySelector('#aiEditBox > .small');
+        if (intro) intro.textContent = 'הערכים חושבו לפי תווית היצרן. הכמות היא משקל האריזה. שנה אותה לכמות שאכלת, בחר ארוחה ורק אז אשר.';
+        if (typeof msg === 'function') msg('התווית נקראה. בדוק את הכמות ואת הערכים לפני ההוספה.', 'ok');
+      } catch (error) {
+        const text = 'קריאת התווית נכשלה: ' + error.message + '. נסה לצלם יחד את חזית המוצר ואת טבלת הערכים.';
+        if (origin === 'chat' && typeof window.addChat === 'function') window.addChat('ai', text);
+        else if (typeof msg === 'function') msg(text, 'err');
+      } finally {
+        input.value = '';
+      }
+    };
+
+    const addLabelInput = (id, origin) => {
+      if (document.getElementById(id)) return document.getElementById(id);
+      const input = document.createElement('input');
+      input.id = id;
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true;
+      input.className = 'hide';
+      input.dataset.origin = origin;
+      input.addEventListener('change', window.scanNutritionLabel);
+      document.body.appendChild(input);
+      return input;
+    };
+
+    const foodInput = addLabelInput('nutritionLabelInput', 'food');
+    const cameraInput = document.getElementById('aiCamera');
+    const quick = cameraInput?.closest('.quick');
+    const cameraButton = quick?.querySelector('button[onclick*="aiCamera"]');
+    if (quick && cameraButton && !document.getElementById('nutritionLabelButton')) {
+      const button = document.createElement('button');
+      button.id = 'nutritionLabelButton';
+      button.type = 'button';
+      button.className = cameraButton.className;
+      button.textContent = '🏷️';
+      button.title = 'צילום תווית וחישוב ערכים';
+      button.setAttribute('aria-label', 'צילום תווית וחישוב ערכים');
+      button.addEventListener('click', () => foodInput.click());
+      cameraButton.insertAdjacentElement('afterend', button);
+    }
+
+    const chatInput = addLabelInput('chatNutritionLabelInput', 'chat');
+    const chatTools = document.querySelector('#chatMediaTools > div');
+    if (chatTools && !document.getElementById('chatNutritionLabelButton')) {
+      chatTools.style.gridTemplateColumns = 'repeat(3,1fr)';
+      const button = document.createElement('button');
+      button.id = 'chatNutritionLabelButton';
+      button.type = 'button';
+      button.textContent = '🏷️ תווית';
+      button.title = 'צלם תווית מזון';
+      button.addEventListener('click', () => chatInput.click());
+      chatTools.appendChild(button);
+    }
+
+    window.__nutritionLabelScanner = true;
+  }
+
   if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
     style.id = 'meal-summary-table-style-v3';
@@ -1151,8 +1306,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); installNutritionLabelScanner(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); installAiMealTargetPicker(); installNutritionLabelScanner(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
