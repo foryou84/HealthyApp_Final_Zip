@@ -966,6 +966,90 @@
     }
   }
 
+  function installFixedMealsSaveRepair() {
+    const box = document.getElementById('fixedMealsBox');
+    if (!box || window.__fixedMealsSaveRepairInstalled) return;
+    window.__fixedMealsSaveRepairInstalled = true;
+
+    const manualItem = () => {
+      const name = document.getElementById('mName');
+      const amount = document.getElementById('mAmount');
+      const unit = document.getElementById('mUnit');
+      const gramPerUnit = document.getElementById('mGramPerUnit');
+      const calories = document.getElementById('mCal');
+      const protein = document.getElementById('mPro');
+      const carbs = document.getElementById('mCarb');
+      const fat = document.getElementById('mFat');
+      const vegetables = document.getElementById('mVeg');
+      if (!name || !amount || !unit) return null;
+      const quantity = num(amount.value);
+      const factor = unit.value === 'g' ? 1 : (num(gramPerUnit?.value) || 1);
+      const grams = document.getElementById('mode100')?.classList.contains('active') ? quantity : quantity * factor;
+      if (!name.value.trim() || grams <= 0) return null;
+      const ratio = grams / 100;
+      return {
+        id: Date.now() + Math.random(),
+        date: typeof todayKey === 'function' ? todayKey() : new Date().toLocaleDateString('en-CA'),
+        time: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+        meal: st.currentMeal || 'בוקר',
+        name: name.value.trim(),
+        amount: grams,
+        unit: 'g',
+        cal: num(calories?.value) * ratio,
+        p: num(protein?.value) * ratio,
+        c: num(carbs?.value) * ratio,
+        f: num(fat?.value) * ratio,
+        v: num(vegetables?.value) * ratio,
+        w: 0,
+        src: 'ידני'
+      };
+    };
+
+    window.saveCurrentMealAsFixed = () => {
+      const meal = st.currentMeal || 'בוקר';
+      let items = (st.entries || []).filter(entry => (entry.meal || 'בוקר') === meal);
+      let usedDisplayedFood = false;
+      if (!items.length) {
+        const item = manualItem();
+        if (!item) {
+          alert('אין פריטים בארוחה ואין מאכל מוכן במחשבון');
+          return;
+        }
+        items = [item];
+        usedDisplayedFood = true;
+      }
+      const defaultName = items.length === 1 ? items[0].name : `${meal} קבועה`;
+      window.openAppKeyboard('שם לארוחה הקבועה', defaultName, 'text', value => {
+        const fixedName = String(value || '').trim();
+        if (!fixedName) return;
+        st.fixedMeals = st.fixedMeals || [];
+        st.fixedMeals.unshift({
+          id: Date.now(),
+          name: fixedName,
+          photo: '',
+          meal,
+          items: items.map(item => ({ ...item, id: Date.now() + Math.random() }))
+        });
+        if (typeof save === 'function') save();
+        if (typeof render === 'function') render();
+        if (typeof window.forceCloudSave === 'function') window.forceCloudSave().catch(console.error);
+        const updatedBox = document.getElementById('fixedMealsBox');
+        if (updatedBox) {
+          const status = document.createElement('div');
+          status.className = 'notice ok';
+          status.style.marginBottom = '8px';
+          status.textContent = usedDisplayedFood ? 'המאכל המוצג נשמר בקבועות ✓' : 'הארוחה נשמרה בקבועות ✓';
+          updatedBox.prepend(status);
+          setTimeout(() => status.remove(), 6000);
+        }
+      });
+    };
+
+    const card = box.closest('.card');
+    const explanation = card?.querySelector('.small');
+    if (explanation) explanation.textContent = 'שמור את הארוחה הנוכחית. אם עדיין לא הוספת אותה ליומן, המאכל שמוצג במחשבון יישמר כארוחה קבועה.';
+  }
+
   if (!document.getElementById('meal-summary-table-style-v3')) {
     const style = document.createElement('style');
     style.id = 'meal-summary-table-style-v3';
@@ -1005,8 +1089,8 @@
   }
 
   const refresh = force => { try { renderMealJournalTable(!!force); } catch (e) { console.error('meal summary render failed', e); } };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); refresh(true); }, 50));
-  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); refresh(true); }, 50);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); refresh(true); }, 50));
+  else setTimeout(() => { installGlobalIosKeyboardRecovery(); installNativeKeyboardControls(); installUnifiedPhotoPicker(); installChatMediaTools(); installManualConversionLayout(); installAppleHealthStepsBridge(); installFixedMealsSaveRepair(); refresh(true); }, 50);
 
   document.addEventListener('click', () => setTimeout(() => refresh(false), 250), true);
   document.addEventListener('change', () => setTimeout(() => refresh(false), 150), true);
