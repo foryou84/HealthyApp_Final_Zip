@@ -1,0 +1,11 @@
+{
+  "name":"healthy-app-final-zip",
+  "private":true,
+  "dependencies":{
+    "firebase-admin":"^14.3.0",
+    "web-push":"^3.6.7"
+  },
+  "overrides":{
+    "uuid":"^11.1.1"
+  }
+}
