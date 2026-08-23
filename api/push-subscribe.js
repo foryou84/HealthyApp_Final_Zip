@@ -1,5 +1,16 @@
 const {firebaseAdmin}=require('../lib/firebase-admin');
 
+function diagnosticCode(error){
+  const code=String(error?.code||'');
+  const message=String(error?.message||'');
+  if(error instanceof SyntaxError)return 'FIREBASE_JSON_INVALID';
+  if(/id-token|audience|issuer|auth\/argument-error/i.test(code+' '+message))return 'FIREBASE_LOGIN';
+  if(/private key|credential|PEM|DECODER routines/i.test(message))return 'FIREBASE_PRIVATE_KEY';
+  if(/permission|PERMISSION_DENIED/i.test(code+' '+message))return 'FIREBASE_PERMISSION';
+  if(/NOT_FOUND|database.*not.*exist/i.test(code+' '+message))return 'FIRESTORE_NOT_FOUND';
+  return code||error?.name||'SERVER_SETUP';
+}
+
 module.exports=async(req,res)=>{
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   try{
@@ -23,7 +34,8 @@ module.exports=async(req,res)=>{
     }},{merge:true});
     return res.status(200).json({ok:true});
   }catch(error){
-    console.error('push-subscribe',error);
-    return res.status(500).json({error:'לא ניתן לשמור את ההתראות כעת.'});
+    const diagnostic=diagnosticCode(error);
+    console.error('push-subscribe',{diagnostic,error});
+    return res.status(500).json({error:`לא ניתן לשמור את ההתראות כעת. קוד אבחון: ${diagnostic}`});
   }
 };
