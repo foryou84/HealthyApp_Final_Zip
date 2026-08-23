@@ -34,6 +34,9 @@ button{border:0;background:var(--blue);color:#fff;font-weight:900;margin-top:10p
 .suggest{position:relative}.suggestbox{position:absolute;z-index:10;top:100%;left:0;right:0;background:#fff;border:1px solid var(--b);border-radius:16px;box-shadow:0 10px 25px #0001;overflow:hidden}
 .suggestbox button{background:#fff;color:#111;text-align:right;border-radius:0;margin:0;border-bottom:1px solid var(--b)}
 .hide{display:none}
+#firebaseAuthCard .auth-connected-only{display:none}
+#firebaseAuthCard.auth-connected .auth-login-only{display:none}
+#firebaseAuthCard.auth-connected .auth-connected-only{display:block}
 .quick{display:grid;grid-template-columns:1fr auto auto;gap:8px}.mic{width:58px;font-size:22px}
 .calc-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 10px}
 .mode-btn{background:#e5e7eb;color:#333;margin:0}
@@ -149,12 +152,16 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 
 <div class="card"><h2>🇮🇱 מאגר משרד הבריאות MABAT</h2><div class="small">המאגר מוטמע קבוע באפליקציה. אין צורך בטעינה מהאינטרנט.</div><div id="mabatStatus" class="notice ok">מאגר מקומי מוכן: 4,624 פריטי מזון + יחידות מידה.</div></div><button onclick="fetchMabat()">טען מאגר MABAT</button><div id="mabatStatus" class="notice">לא נטען עדיין.</div></div>
 
-<div class="card"><h2>🔐 התחברות וסנכרון Firebase</h2>
+<div class="card" id="firebaseAuthCard"><h2>🔐 התחברות וסנכרון Firebase</h2>
+<div class="auth-login-only">
 <div class="grid2"><input id="loginEmail" type="email" placeholder="email"><input id="loginPassword" type="password" placeholder="password"></div>
-<div class="grid3"><button onclick="loginUser(loginEmail.value,loginPassword.value)">התחברות</button><button onclick="registerUser(loginEmail.value,loginPassword.value)">הרשמה</button><button style="background:#ef4444" onclick="logoutUser()">התנתקות</button></div>
+<div class="grid2"><button onclick="loginUser(loginEmail.value,loginPassword.value)">התחברות</button><button onclick="registerUser(loginEmail.value,loginPassword.value)">הרשמה</button></div>
 <button style="background:#6b7280" onclick="resetPassword(loginEmail.value)">🔑 שכחתי סיסמה</button>
 <div class="small">הזן את כתובת האימייל ולחץ על "שכחתי סיסמה". Firebase ישלח קישור לאיפוס.</div>
-<div id="authStatus" class="notice">לא מחובר</div></div>
+</div>
+<div id="authStatus" class="notice">לא מחובר</div>
+<div class="auth-connected-only"><button style="background:#ef4444" onclick="logoutUser()">התנתקות</button></div>
+</div>
 </section>
 
 <section id="pToday" class="page">
@@ -342,7 +349,7 @@ function closeAppKeyboard(){let el=document.getElementById('appKeyboard');if(el)
 function saveAppKeyboard(){let cb=appKeyboardSave,val=appKeyboardValue.trim();closeAppKeyboard();if(cb)cb(val)}
 function editManualFoodName(){openAppKeyboard('עריכת שם המאכל',mName.value,'text',val=>{if(val)mName.value=val})}
 function save(){localStorage.setItem(KEY,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
-function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render()}
+function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');let authCard=document.getElementById('firebaseAuthCard');if(authCard)authCard.style.display=p==='Profile'?'block':'none';render();window.scrollTo({top:0,behavior:'auto'})}
 function setMeal(m,el){st.currentMeal=m;document.querySelectorAll('.meal-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');save()}
 function totals(){return st.entries.reduce((a,e)=>(a.cal+=e.cal||0,a.p+=e.p||0,a.c+=e.c||0,a.f+=e.f||0,a.v+=e.v||0,a.w+=e.w||0,a),{cal:0,p:0,c:0,f:0,v:0,w:0})}
 function bar(label,val,target){let pct=Math.min(100,target?val/target*100:0);return `<div class=row><span>${label}</span><span>נאכל ${r(val)} מתוך ${r(target)}</span></div><div class=bar><div class=fill style="width:${pct}%"></div></div>`}
@@ -696,13 +703,14 @@ import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/fireb
 const firebaseConfig={apiKey:"AIzaSyAkF2i0utPJayFqhzqWEmGh2hIUGhMJZ2o",authDomain:"healthylife-a054b.firebaseapp.com",projectId:"healthylife-a054b",storageBucket:"healthylife-a054b.firebasestorage.app",messagingSenderId:"307773262968",appId:"1:307773262968:web:7fdc12c7789f3d447ab18d"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let fbUser=null;
 function authMsg(t,ok=false){let e=document.getElementById('authStatus');if(e){e.textContent=t;e.className='notice '+(ok?'ok':'err')}}
+function setAuthUi(connected){let card=document.getElementById('firebaseAuthCard');if(card)card.classList.toggle('auth-connected',Boolean(connected))}
 window.registerUser=async(email,pw)=>{try{await createUserWithEmailAndPassword(auth,email,pw);authMsg('נרשמת',true)}catch(e){authMsg(e.message,false)}}
 window.loginUser=async(email,pw)=>{try{await signInWithEmailAndPassword(auth,email,pw)}catch(e){authMsg(e.message,false)}}
 window.resetPassword=async(email)=>{try{email=(email||'').trim();if(!email)throw new Error('הזן כתובת אימייל');await sendPasswordResetEmail(auth,email);authMsg('נשלח מייל לאיפוס סיסמה ל-'+email,true)}catch(e){authMsg('איפוס סיסמה: '+e.message,false)}}
 window.logoutUser=async()=>signOut(auth);
 window.cloudSave=()=>{clearTimeout(window.__saveT);window.__saveT=setTimeout(async()=>{if(!fbUser||typeof st==='undefined')return;await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})},900)}
 window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})}
-onAuthStateChanged(auth,async u=>{fbUser=u;if(!u){authMsg('לא מחובר',false);return}authMsg('מחובר: '+u.email,true);let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().data){Object.assign(st,snap.data().data);save();render()}else await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString()},{merge:true})});
+onAuthStateChanged(auth,async u=>{fbUser=u;setAuthUi(Boolean(u));if(!u){authMsg('לא מחובר',false);return}authMsg('מחובר: '+u.email,true);let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().data){Object.assign(st,snap.data().data);save();render()}else await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString()},{merge:true})});
 window.__cloudSaveHook=()=>{if(window.cloudSave)window.cloudSave()}
 </script>
 
