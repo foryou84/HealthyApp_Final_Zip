@@ -2,7 +2,7 @@
   "name": "אורח חיים בריא",
   "short_name": "בריאות",
   "start_url": "./?home-screen=20260818-18",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#f4f6fb",
   "theme_color": "#007aff",
   "dir": "rtl",
