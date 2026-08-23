@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v9-water-reminders';
+const CACHE_NAME='healthy-app-v10-ios-web-push';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js','./water-reminders.js'];
 
 self.addEventListener('install',event=>{
@@ -26,6 +26,16 @@ async function htmlWithMealTable(request){
   if(!contentType.includes('text/html'))return response;
 
   let html=await response.text();
+  const headTags=[];
+  if(!html.includes('apple-mobile-web-app-capable'))headTags.push('<meta name="apple-mobile-web-app-capable" content="yes">');
+  if(!html.includes('mobile-web-app-capable'))headTags.push('<meta name="mobile-web-app-capable" content="yes">');
+  if(!html.includes('apple-mobile-web-app-status-bar-style'))headTags.push('<meta name="apple-mobile-web-app-status-bar-style" content="default">');
+  if(!html.includes('rel="manifest"')&&!html.includes("rel='manifest'"))headTags.push('<link rel="manifest" href="./manifest.webmanifest?v=20260823-2">');
+  if(headTags.length){
+    const tags=headTags.join('');
+    html=html.includes('</head>')?html.replace('</head>',tags+'</head>'):tags+html;
+  }
+
   const scripts=[];
   if(!html.includes('meal-table-fix.js'))scripts.push('<script src="./meal-table-fix.js?v=20260818-6"></script>');
   if(!html.includes('water-reminders.js'))scripts.push('<script src="./water-reminders.js?v=20260822-1"></script>');
@@ -46,7 +56,7 @@ self.addEventListener('fetch',event=>{
     event.respondWith(htmlWithMealTable(event.request));
     return;
   }
-  if(url.pathname.endsWith('/meal-table-fix.js')){
+  if(url.pathname.endsWith('/meal-table-fix.js')||url.pathname.endsWith('/water-reminders.js')||url.pathname.endsWith('/manifest.webmanifest')){
     event.respondWith(fetch(event.request,{cache:'no-store'}).catch(()=>caches.match(event.request)));
     return;
   }
