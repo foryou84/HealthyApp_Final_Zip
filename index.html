@@ -150,7 +150,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div id="aiConnectionStatus" class="notice">בדיקה תעבוד לאחר העלאה ל-Vercel והגדרת מפתחות Environment Variables.</div>
 </div>
 
-<div class="card"><h2>🇮🇱 מאגר משרד הבריאות MABAT</h2><div class="small">המאגר מוטמע קבוע באפליקציה. אין צורך בטעינה מהאינטרנט.</div><div id="mabatStatus" class="notice ok">מאגר מקומי מוכן: 4,624 פריטי מזון + יחידות מידה.</div></div><button onclick="fetchMabat()">טען מאגר MABAT</button><div id="mabatStatus" class="notice">לא נטען עדיין.</div></div>
+<div class="card"><h2>🇮🇱 מאגר משרד הבריאות MABAT</h2><div class="small">המאגר מוטמע קבוע באפליקציה. אין צורך בטעינה מהאינטרנט.</div><div id="mabatStatus" class="notice ok">מאגר מקומי מוכן: 4,624 פריטי מזון + יחידות מידה.</div></div>
 
 <div class="card" id="firebaseAuthCard"><h2>🔐 התחברות וסנכרון Firebase</h2>
 <div class="auth-login-only">
@@ -200,13 +200,12 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <input type="file" id="aiCamera" accept="image/*" capture="environment" class="hide" onchange="uploadImage(event,false)">
 <input type="file" id="aiGallery" accept="image/*" class="hide" onchange="uploadImage(event,false)">
 </div>
-<div class="grid2"><button id="quickAnalyzeBtn" onclick="analyzeQuickWithGemini()">בדוק עם Gemini</button><button style="background:#6b7280" onclick="clearAiReview()">נקה</button></div>
+<div class="grid2"><button onclick="addQuick()">➕ הוסף מהמאגר</button><button id="quickAnalyzeBtn" style="background:#f59e0b" onclick="analyzeQuickWithGemini()">🤖 בדוק עם AI</button></div><button style="background:#eef2ff;color:#3730a3;margin-top:8px" onclick="clearAiReview()">נקה שדה ובדיקה</button>
 <div id="msg" class="notice hide"></div>
 <div id="aiEditBox" class="notice hide"></div><div class="notice" style="margin-top:8px"><b>📷 אין אפשרות לשקול?</b> צלם את הארוחה. Gemini יזהה מאכלים וכמויות, לאחר מכן תוצג השוואה מול ערכים שאישרת ומול MABAT. דבר לא יישמר לפני אישורך.</div>
 </div>
 
-<div class="card manual-card">
-<h2>✍️ מאכל ידני - חישוב כפול</h2>
+<details class="card manual-card"><summary style="cursor:pointer;font-size:22px;font-weight:900">✍️ הזנה ידנית או מרובה</summary>
 <div class="small">בחר מאכל, שלוף ערכים מהמאגר או מ-AI, עדכן כמות ושמור לארוחה.</div>
 
 <div class="manual-top">
@@ -241,21 +240,12 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 
 <div id="manualResult" class="manual-result-compact"></div>
 
-<div class="manual-actions">
-  <button onclick="addManual()">💾 שמור לארוחה</button>
-  <button class="reset-mini" onclick="resetManualFood()">🔄 איפוס</button>
-  <button style="background:#eef2ff;color:#3730a3" onclick="manualFindFromDb()">🗂️ מאגר</button>
-</div>
+<div class="manual-actions"><button onclick="addManual()">💾 שמור לארוחה</button><button class="reset-mini" onclick="resetManualFood()">🔄 איפוס</button></div>
 
 <details style="margin-top:10px">
   <summary style="cursor:pointer;font-weight:800;color:var(--muted)">הזנה מרובה / כמה פריטים</summary>
   <textarea id="bulkFoodText" rows="4" placeholder="פיתה 105 גרם&#10;גבינה צהובה 20 גרם&#10;ביצה L"></textarea>
-  <div class="grid2"><button style="background:#6b7280" onclick="parseBulkLocal()">פירוק לפי מאגר</button><button style="background:#f59e0b" onclick="parseBulkWithAi()">פירוק מלא ב-AI</button></div>
-</details>
-</div>
-
-<div class="card"><h2>⭐ ארוחות קבועות</h2><div class="small">שמור את הארוחה הנוכחית עם שם ותמונה אופציונלית, או שלוף ארוחה ששמרת.</div><div class="grid2"><button onclick="saveCurrentMealAsFixed()">⭐ שמור לקבועות</button><button style="background:#6b7280" onclick="document.getElementById('fixedMealPhoto').click()">📷 שמור עם תמונה</button></div><input type="file" id="fixedMealPhoto" accept="image/*" class="hide" onchange="saveFixedMealWithPhoto(event)"><div id="fixedMealsBox" class="notice"></div><button style="background:#ef4444" onclick="clearFixedMeals()">נקה קבועות</button></div>
-</section>
+  <div class="grid2"><button style="background:#6b7280" onclick="parseBulkLocal()">פירוק לפי מאגר</button><button style="background:#f59e0b" onclick="parseBulkWithAi()">פירוק מלא ב-AI</button></div></details></details><details class="card"><summary style="cursor:pointer;font-size:22px;font-weight:900">⭐ ארוחות קבועות</summary><div class="small">שמור את הארוחה הנוכחית עם שם ותמונה אופציונלית, או שלוף ארוחה ששמרת.</div><div class="grid2"><button onclick="saveCurrentMealAsFixed()">⭐ שמור לקבועות</button><button style="background:#6b7280" onclick="document.getElementById('fixedMealPhoto').click()">📷 שמור עם תמונה</button></div><input type="file" id="fixedMealPhoto" accept="image/*" class="hide" onchange="saveFixedMealWithPhoto(event)"><div id="fixedMealsBox" class="notice"></div><button style="background:#ef4444" onclick="clearFixedMeals()">נקה קבועות</button></details></section>
 
 <section id="pWorkout" class="page">
 <div class="card"><h2>🏋️ אימון</h2><div class="grid2"><div><label>סוג</label><select id="wType"><option value="walk">הליכה</option><option value="strength">כוח</option><option value="bike">אופניים</option><option value="other">אחר</option></select></div><div><label>דקות</label><input id="wMin" value="20" inputmode="decimal"></div></div><button onclick="addWorkout()">שמור אימון</button></div>
@@ -287,9 +277,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 
 
 <section id="pChat" class="page"><div class="card"><h2>💬 צ׳אט תזונה ואימון</h2><div class="small">שאל: כמה חלבון נשאר לי? מה לאכול בארוחה הבאה?</div><div id="chatLog" class="chatbox"></div><textarea id="chatInput" rows="3" placeholder="כתוב שאלה..."></textarea><div class="grid2"><button onclick="askCoachChat()">שאל AI</button><button style="background:#6b7280" onclick="localCoachAnswer()">תשובה מקומית</button></div></div></section>
-<section id="pLog" class="page">
-<div class="card"><h2>🧾 יומן</h2><div id="entries"></div></div>
-</section>
+
 </div>
 
 <nav>
