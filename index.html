@@ -34,6 +34,9 @@ button{border:0;background:var(--blue);color:#fff;font-weight:900;margin-top:10p
 .suggest{position:relative}.suggestbox{position:absolute;z-index:10;top:100%;left:0;right:0;background:#fff;border:1px solid var(--b);border-radius:16px;box-shadow:0 10px 25px #0001;overflow:hidden}
 .suggestbox button{background:#fff;color:#111;text-align:right;border-radius:0;margin:0;border-bottom:1px solid var(--b)}
 .hide{display:none}
+#firebaseAuthCard .auth-connected-only{display:none}
+#firebaseAuthCard.auth-connected .auth-login-only{display:none}
+#firebaseAuthCard.auth-connected .auth-connected-only{display:block}
 .quick{display:grid;grid-template-columns:1fr auto auto;gap:8px}.mic{width:58px;font-size:22px}
 .calc-mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 10px}
 .mode-btn{background:#e5e7eb;color:#333;margin:0}
@@ -147,14 +150,18 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div id="aiConnectionStatus" class="notice">בדיקה תעבוד לאחר העלאה ל-Vercel והגדרת מפתחות Environment Variables.</div>
 </div>
 
-<div class="card"><h2>🇮🇱 מאגר משרד הבריאות MABAT</h2><div class="small">המאגר מוטמע קבוע באפליקציה. אין צורך בטעינה מהאינטרנט.</div><div id="mabatStatus" class="notice ok">מאגר מקומי מוכן: 4,624 פריטי מזון + יחידות מידה.</div></div><button onclick="fetchMabat()">טען מאגר MABAT</button><div id="mabatStatus" class="notice">לא נטען עדיין.</div></div>
+<div class="card"><h2>🇮🇱 מאגר משרד הבריאות MABAT</h2><div class="small">המאגר מוטמע קבוע באפליקציה. אין צורך בטעינה מהאינטרנט.</div><div id="mabatStatus" class="notice ok">מאגר מקומי מוכן: 4,624 פריטי מזון + יחידות מידה.</div></div>
 
-<div class="card"><h2>🔐 התחברות וסנכרון Firebase</h2>
+<div class="card" id="firebaseAuthCard"><h2>🔐 התחברות וסנכרון Firebase</h2>
+<div class="auth-login-only">
 <div class="grid2"><input id="loginEmail" type="email" placeholder="email"><input id="loginPassword" type="password" placeholder="password"></div>
-<div class="grid3"><button onclick="loginUser(loginEmail.value,loginPassword.value)">התחברות</button><button onclick="registerUser(loginEmail.value,loginPassword.value)">הרשמה</button><button style="background:#ef4444" onclick="logoutUser()">התנתקות</button></div>
+<div class="grid2"><button onclick="loginUser(loginEmail.value,loginPassword.value)">התחברות</button><button onclick="registerUser(loginEmail.value,loginPassword.value)">הרשמה</button></div>
 <button style="background:#6b7280" onclick="resetPassword(loginEmail.value)">🔑 שכחתי סיסמה</button>
 <div class="small">הזן את כתובת האימייל ולחץ על "שכחתי סיסמה". Firebase ישלח קישור לאיפוס.</div>
-<div id="authStatus" class="notice">לא מחובר</div></div>
+</div>
+<div id="authStatus" class="notice">לא מחובר</div>
+<div class="auth-connected-only"><button style="background:#ef4444" onclick="logoutUser()">התנתקות</button></div>
+</div>
 </section>
 
 <section id="pToday" class="page">
@@ -193,13 +200,12 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <input type="file" id="aiCamera" accept="image/*" capture="environment" class="hide" onchange="uploadImage(event,false)">
 <input type="file" id="aiGallery" accept="image/*" class="hide" onchange="uploadImage(event,false)">
 </div>
-<div class="grid2"><button id="quickAnalyzeBtn" onclick="analyzeQuickWithGemini()">בדוק עם Gemini</button><button style="background:#6b7280" onclick="clearAiReview()">נקה</button></div>
+<div class="grid2"><button onclick="addQuick()">➕ הוסף מהמאגר</button><button id="quickAnalyzeBtn" style="background:#f59e0b" onclick="analyzeQuickWithGemini()">🤖 בדוק עם AI</button></div><button style="background:#eef2ff;color:#3730a3;margin-top:8px" onclick="clearAiReview()">נקה שדה ובדיקה</button>
 <div id="msg" class="notice hide"></div>
 <div id="aiEditBox" class="notice hide"></div><div class="notice" style="margin-top:8px"><b>📷 אין אפשרות לשקול?</b> צלם את הארוחה. Gemini יזהה מאכלים וכמויות, לאחר מכן תוצג השוואה מול ערכים שאישרת ומול MABAT. דבר לא יישמר לפני אישורך.</div>
 </div>
 
-<div class="card manual-card">
-<h2>✍️ מאכל ידני - חישוב כפול</h2>
+<details class="card manual-card"><summary style="cursor:pointer;font-size:22px;font-weight:900">✍️ הזנה ידנית או מרובה</summary>
 <div class="small">בחר מאכל, שלוף ערכים מהמאגר או מ-AI, עדכן כמות ושמור לארוחה.</div>
 
 <div class="manual-top">
@@ -234,21 +240,12 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 
 <div id="manualResult" class="manual-result-compact"></div>
 
-<div class="manual-actions">
-  <button onclick="addManual()">💾 שמור לארוחה</button>
-  <button class="reset-mini" onclick="resetManualFood()">🔄 איפוס</button>
-  <button style="background:#eef2ff;color:#3730a3" onclick="manualFindFromDb()">🗂️ מאגר</button>
-</div>
+<div class="manual-actions"><button onclick="addManual()">💾 שמור לארוחה</button><button class="reset-mini" onclick="resetManualFood()">🔄 איפוס</button></div>
 
 <details style="margin-top:10px">
   <summary style="cursor:pointer;font-weight:800;color:var(--muted)">הזנה מרובה / כמה פריטים</summary>
   <textarea id="bulkFoodText" rows="4" placeholder="פיתה 105 גרם&#10;גבינה צהובה 20 גרם&#10;ביצה L"></textarea>
-  <div class="grid2"><button style="background:#6b7280" onclick="parseBulkLocal()">פירוק לפי מאגר</button><button style="background:#f59e0b" onclick="parseBulkWithAi()">פירוק מלא ב-AI</button></div>
-</details>
-</div>
-
-<div class="card"><h2>⭐ ארוחות קבועות</h2><div class="small">שמור את הארוחה הנוכחית עם שם ותמונה אופציונלית, או שלוף ארוחה ששמרת.</div><div class="grid2"><button onclick="saveCurrentMealAsFixed()">⭐ שמור לקבועות</button><button style="background:#6b7280" onclick="document.getElementById('fixedMealPhoto').click()">📷 שמור עם תמונה</button></div><input type="file" id="fixedMealPhoto" accept="image/*" class="hide" onchange="saveFixedMealWithPhoto(event)"><div id="fixedMealsBox" class="notice"></div><button style="background:#ef4444" onclick="clearFixedMeals()">נקה קבועות</button></div>
-</section>
+  <div class="grid2"><button style="background:#6b7280" onclick="parseBulkLocal()">פירוק לפי מאגר</button><button style="background:#f59e0b" onclick="parseBulkWithAi()">פירוק מלא ב-AI</button></div></details></details><details class="card"><summary style="cursor:pointer;font-size:22px;font-weight:900">⭐ ארוחות קבועות</summary><div class="small">שמור את הארוחה הנוכחית עם שם ותמונה אופציונלית, או שלוף ארוחה ששמרת.</div><div class="grid2"><button onclick="saveCurrentMealAsFixed()">⭐ שמור לקבועות</button><button style="background:#6b7280" onclick="document.getElementById('fixedMealPhoto').click()">📷 שמור עם תמונה</button></div><input type="file" id="fixedMealPhoto" accept="image/*" class="hide" onchange="saveFixedMealWithPhoto(event)"><div id="fixedMealsBox" class="notice"></div><button style="background:#ef4444" onclick="clearFixedMeals()">נקה קבועות</button></details></section>
 
 <section id="pWorkout" class="page">
 <div class="card"><h2>🏋️ אימון</h2><div class="grid2"><div><label>סוג</label><select id="wType"><option value="walk">הליכה</option><option value="strength">כוח</option><option value="bike">אופניים</option><option value="other">אחר</option></select></div><div><label>דקות</label><input id="wMin" value="20" inputmode="decimal"></div></div><button onclick="addWorkout()">שמור אימון</button></div>
@@ -280,9 +277,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 
 
 <section id="pChat" class="page"><div class="card"><h2>💬 צ׳אט תזונה ואימון</h2><div class="small">שאל: כמה חלבון נשאר לי? מה לאכול בארוחה הבאה?</div><div id="chatLog" class="chatbox"></div><textarea id="chatInput" rows="3" placeholder="כתוב שאלה..."></textarea><div class="grid2"><button onclick="askCoachChat()">שאל AI</button><button style="background:#6b7280" onclick="localCoachAnswer()">תשובה מקומית</button></div></div></section>
-<section id="pLog" class="page">
-<div class="card"><h2>🧾 יומן</h2><div id="entries"></div></div>
-</section>
+
 </div>
 
 <nav>
@@ -296,8 +291,9 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 </nav>
 
 <script>
+function localDateKey(){let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const KEY='healthy_life_fixed_dual_calc_v1';
-const base={profile:{age:63,weight:83.5,height:174,goalWeight:78,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:new Date().toISOString().slice(0,10),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
+const base={profile:{age:63,weight:83.5,height:174,goalWeight:78,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
 let st=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(base);
 let manualMode='serving';
 let analysisRange='month';
@@ -342,14 +338,14 @@ function closeAppKeyboard(){let el=document.getElementById('appKeyboard');if(el)
 function saveAppKeyboard(){let cb=appKeyboardSave,val=appKeyboardValue.trim();closeAppKeyboard();if(cb)cb(val)}
 function editManualFoodName(){openAppKeyboard('עריכת שם המאכל',mName.value,'text',val=>{if(val)mName.value=val})}
 function save(){localStorage.setItem(KEY,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
-function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render()}
+function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');let authCard=document.getElementById('firebaseAuthCard');if(authCard)authCard.style.display=p==='Profile'?'block':'none';render();window.scrollTo({top:0,behavior:'auto'})}
 function setMeal(m,el){st.currentMeal=m;document.querySelectorAll('.meal-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');save()}
 function totals(){return st.entries.reduce((a,e)=>(a.cal+=e.cal||0,a.p+=e.p||0,a.c+=e.c||0,a.f+=e.f||0,a.v+=e.v||0,a.w+=e.w||0,a),{cal:0,p:0,c:0,f:0,v:0,w:0})}
 function bar(label,val,target){let pct=Math.min(100,target?val/target*100:0);return `<div class=row><span>${label}</span><span>נאכל ${r(val)} מתוך ${r(target)}</span></div><div class=bar><div class=fill style="width:${pct}%"></div></div>`}
-function todayKey(){return new Date().toISOString().slice(0,10)}
+function todayKey(){return localDateKey()}
 function archiveCurrentDay(){if(!st.history)st.history={};let k=st.dateKey||todayKey();st.history[k]={date:k,entries:st.entries||[],water:st.water||0,steps:st.steps||0,workouts:st.workouts||[],targets:st.targets};save()}
 function ensureToday(){let k=todayKey();if(st.dateKey!==k){archiveCurrentDay();st.dateKey=k;st.entries=[];st.water=0;st.steps=0;st.workouts=[];save()}}
-function render(){ensureToday();date.textContent=new Date().toLocaleDateString('he-IL');coachStyle.value=st.profile.coach||'רגיל';let t=totals(),g=st.targets;progress.innerHTML=bar('קלוריות',t.cal,g.calories)+bar('חלבון',t.p,g.protein)+bar('פחמימה',t.c,g.carbs)+bar('שומן',t.f,g.fat);let totalWater=(st.water||0)+(t.w||0);waterText.textContent=`${r(totalWater)} / ${g.water} מ״ל`;waterFill.style.width=Math.min(100,totalWater/g.water*100)+'%';coach.textContent=coachMsg(t,g);stepsDisp.textContent=st.steps||0;entries.innerHTML=st.entries.map(e=>`<div class=entry><div><b>${e.name}</b><div class=small>${e.meal||''} - ${r(e.amount)} ${e.unit||'ג׳'} - ${r(e.cal)} קל׳ | חלבון ${r(e.p)} | פחמימה ${r(e.c)} | שומן ${r(e.f)}</div></div><button class=del onclick="delE('${e.id}')">מחק</button></div>`).join('')||'<div class=notice>אין רשומות היום.</div>';workouts.innerHTML=st.workouts.map(w=>`<div class=entry><div><b>${w.type}</b><div class=small>${w.min} דקות</div></div><button class=del onclick="delW('${w.id}')">מחק</button></div>`).join('')||'<div class=notice>אין אימונים היום.</div>';manualPreview();renderMealJournal();renderHistoryAnalysis();save()}
+function render(){ensureToday();date.textContent=new Date().toLocaleDateString('he-IL');coachStyle.value=st.profile.coach||'רגיל';let t=totals(),g=st.targets;progress.innerHTML=bar('קלוריות',t.cal,g.calories)+bar('חלבון',t.p,g.protein)+bar('פחמימה',t.c,g.carbs)+bar('שומן',t.f,g.fat);let totalWater=(st.water||0)+(t.w||0);waterText.textContent=`${r(totalWater)} / ${g.water} מ״ל`;waterFill.style.width=Math.min(100,totalWater/g.water*100)+'%';coach.textContent=coachMsg(t,g);stepsDisp.textContent=st.steps||0;let legacyEntries=document.getElementById('entries');if(legacyEntries)legacyEntries.innerHTML=st.entries.map(e=>`<div class=entry><div><b>${e.name}</b><div class=small>${e.meal||''} - ${r(e.amount)} ${e.unit||'ג׳'} - ${r(e.cal)} קל׳ | חלבון ${r(e.p)} | פחמימה ${r(e.c)} | שומן ${r(e.f)}</div></div><button class=del onclick="delE('${e.id}')">מחק</button></div>`).join('')||'<div class=notice>אין רשומות היום.</div>';workouts.innerHTML=st.workouts.map(w=>`<div class=entry><div><b>${w.type}</b><div class=small>${w.min} דקות</div></div><button class=del onclick="delW('${w.id}')">מחק</button></div>`).join('')||'<div class=notice>אין אימונים היום.</div>';manualPreview();renderMealJournal();renderHistoryAnalysis();save()}
 function coachMsg(t,g){if(t.cal>g.calories*1.05)return 'חריגה בקלוריות. מומלץ לאזן בארוחה הבאה.';if(t.p<g.protein*.6)return 'חסר חלבון יחסית ליעד היומי.';return 'מצב תקין. המשך לעדכן כמויות מדויקות.'}
 function saveProfile(){let age=n(document.getElementById('age').value),w=n(weight.value),h=n(height.value),act=n(activity.value);let bmr=gender.value==='male'?10*w+6.25*h-5*age+5:10*w+6.25*h-5*age-161;let cal=bmr*act;if(goal.value==='cut')cal-=350;if(goal.value==='bulk')cal+=250;st.profile={...st.profile,age,weight:w,height:h,goalWeight:n(goalWeight.value),gender:gender.value,activity:act,goal:goal.value,saved:true};st.targets.calories=Math.round(cal);st.targets.protein=Math.round(w*1.6);st.targets.carbs=Math.round(cal*.42/4);st.targets.fat=Math.round(cal*.28/9);profileResult.textContent=`יעד יומי: ${st.targets.calories} קלוריות, חלבון ${st.targets.protein} גרם`;save();}
 // ===== UPGRADED ENGINE =====
@@ -470,11 +466,11 @@ async function uploadImage(e){
  e.target.value='';
 }
 function compressImage(file){return new Promise((resolve,reject)=>{let img=new Image(),rr=new FileReader();rr.onerror=reject;rr.onload=()=>img.src=rr.result;img.onerror=reject;img.onload=()=>{let max=480,scale=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c.toDataURL('image/jpeg',.6))};rr.readAsDataURL(file)})}
-function fixedMealItems(){return st.entries.filter(e=>(e.meal||'בוקר')===st.currentMeal)}
-function saveFixedMealObject(name,photo){let items=fixedMealItems();if(!items.length){alert('אין פריטים בארוחה הנוכחית');return}st.fixedMeals=st.fixedMeals||[];st.fixedMeals.unshift({id:Date.now(),name,photo:photo||'',meal:st.currentMeal,items:items.map(e=>({...e,id:Date.now()+Math.random()}))});render();save()}
+function fixedMealItems(){ensureToday();return st.entries.filter(e=>(e.meal||'בוקר')===st.currentMeal)}
+function saveFixedMealObject(name,photo){let items=fixedMealItems();if(!items.length){alert('אין פריטים בארוחה הנוכחית');return}st.fixedMeals=st.fixedMeals||[];st.fixedMeals.unshift({id:Date.now(),name,photo:photo||'',meal:st.currentMeal,items:items.map(e=>({...e,id:Date.now()+Math.random()}))});save();render()}
 function saveCurrentMealAsFixed(){let items=fixedMealItems();if(!items.length){alert('אין פריטים בארוחה הנוכחית');return}let name=prompt('שם לארוחה הקבועה:',st.currentMeal+' קבועה');if(!name)return;saveFixedMealObject(name,'')}
 function saveFixedMealWithPhoto(e){let file=e.target.files[0];if(!file)return;let items=fixedMealItems();if(!items.length){alert('אין פריטים בארוחה הנוכחית');e.target.value='';return}let name=prompt('שם לארוחה הקבועה:',st.currentMeal+' קבועה');if(!name){e.target.value='';return}let img=new Image(),reader=new FileReader();reader.onload=()=>img.src=reader.result;img.onload=()=>{let c=document.createElement('canvas'),max=360,scale=Math.min(1,max/img.width);c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);let photo=c.toDataURL('image/jpeg',0.65);saveFixedMealObject(name,photo);e.target.value=''};reader.readAsDataURL(file)}
-function loadFixedMeal(id){let m=(st.fixedMeals||[]).find(x=>x.id==id);if(!m)return;m.items.forEach(e=>st.entries.unshift({...e,id:Date.now()+Math.random(),date:todayKey(),time:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),meal:st.currentMeal}));render();save();msg('הארוחה הקבועה נוספה ל'+st.currentMeal,'ok')}
+function loadFixedMeal(id){ensureToday();let m=(st.fixedMeals||[]).find(x=>x.id==id);if(!m)return;m.items.forEach(e=>st.entries.unshift({...e,id:Date.now()+Math.random(),date:todayKey(),time:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),meal:st.currentMeal}));render();save();msg('הארוחה הקבועה נוספה ל'+st.currentMeal,'ok')}
 function deleteFixedMeal(id){if(confirm('למחוק את הארוחה הקבועה?')){st.fixedMeals=(st.fixedMeals||[]).filter(x=>x.id!=id);render();save()}}
 function clearFixedMeals(){if(confirm('לנקות את כל הארוחות הקבועות?')){st.fixedMeals=[];render();save()}}
 function renderFixedMeals(){let el=document.getElementById('fixedMealsBox');if(!el)return;let arr=st.fixedMeals||[];if(!arr.length){el.innerHTML='אין ארוחות קבועות. בחר ארוחה למעלה והזן מזונות, ואז שמור אותה כאן.';return}el.innerHTML=arr.map(m=>{let s=m.items.reduce((a,e)=>(a.cal+=e.cal||0,a.p+=e.p||0,a.c+=e.c||0,a.f+=e.f||0,a),{cal:0,p:0,c:0,f:0});return `<div class="entry">${m.photo?`<img src="${m.photo}" style="width:72px;height:58px;object-fit:cover;border-radius:12px;margin-left:8px">`:''}<div><b>${m.name}</b><div class=small>${m.items.length} פריטים | ${r(s.cal)} קל׳ | חלבון ${r(s.p)} | פחמימה ${r(s.c)} | שומן ${r(s.f)}</div></div><div class=entry-actions><button class=chip onclick="loadFixedMeal(${m.id})">📥 שלוף</button><button class=del onclick="deleteFixedMeal(${m.id})">מחק</button></div></div>`}).join('')}
@@ -485,7 +481,7 @@ async function askCoachChat(){let q=chatInput.value.trim();if(!q)return;addChat(
 function localCoachAnswer(){let t=totals(),g=st.targets;addChat('ai',`נשאר להיום בערך: קלוריות ${r(g.calories-t.cal)}, חלבון ${r(g.protein-t.p)}, פחמימה ${r(g.carbs-t.c)}, שומן ${r(g.fat-t.f)}.`)}
 const oldRender=render;render=function(){oldRender();renderFixedMeals();if(window.mabatStatus){mabatStatus.className='notice ok';mabatStatus.textContent='MABAT מוטמע מקומית: '+MABAT_EMBEDDED.length+' פריטים + יחידות מידה';}}
 
-function addWater(x){st.water+=x;render()}function delE(id){st.entries=st.entries.filter(e=>String(e.id)!==String(id));save();render()}function delW(id){st.workouts=st.workouts.filter(e=>String(e.id)!==String(id));save();render()}
+function addWater(x){ensureToday();st.water+=x;render()}function delE(id){st.entries=st.entries.filter(e=>String(e.id)!==String(id));save();render()}function delW(id){st.workouts=st.workouts.filter(e=>String(e.id)!==String(id));save();render()}
 async function resetMeals(){
   if(!confirm('לאפס את כל הארוחות של היום?')) return;
   st.entries=[];
@@ -509,12 +505,12 @@ async function resetDay(){
   render();
   alert('נתוני היום אופסו בהצלחה');
 }
-function addSteps(){let s=n(trackSteps.value);if(s>0){st.steps=(st.steps||0)+s;trackSteps.value='';render()}}
-function addWorkout(){st.workouts.unshift({id:Date.now()+Math.random(),type:wType.options[wType.selectedIndex].text,min:n(wMin.value)});render()}
+function addSteps(){let s=n(trackSteps.value);if(s>0){ensureToday();st.steps=(st.steps||0)+s;trackSteps.value='';render()}}
+function addWorkout(){ensureToday();st.workouts.unshift({id:Date.now()+Math.random(),type:wType.options[wType.selectedIndex].text,min:n(wMin.value)});render()}
 
 function suggest(){let last=quick.value.trim().split(/\s+/).pop();if(!last||!isNaN(Number(last))){sbox.classList.add('hide');return}let m=findMatches(last,8);sbox.innerHTML=m.map(f=>`<button onclick="pick('${f.a[0]}')">${f.name} <span class=small>${Math.round(f.cal)} קל׳ ל-100</span></button>`).join('');sbox.classList.toggle('hide',!m.length)}
 function pick(x){let p=quick.value.trim().split(/\s+/);p[p.length-1]=x;quick.value=p.join(' ')+' ';sbox.classList.add('hide');quick.focus()}
-function addEntry(f,amt){let q=amt/100;let e={id:Date.now()+Math.random(),date:todayKey(),time:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),meal:st.currentMeal,name:f.name,amount:amt,unit:f.u,cal:f.cal*q,p:f.p*q,c:f.c*q,f:f.f*q,v:f.v*q,w:f.w?amt*f.w/100:0,src:f.src||'מקומי'};st.entries.unshift(e)}
+function addEntry(f,amt){ensureToday();let q=amt/100;let e={id:Date.now()+Math.random(),date:todayKey(),time:new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),meal:st.currentMeal,name:f.name,amount:amt,unit:f.u,cal:f.cal*q,p:f.p*q,c:f.c*q,f:f.f*q,v:f.v*q,w:f.w?amt*f.w/100:0,src:f.src||'מקומי'};st.entries.unshift(e)}
 function addQuick(){
 let txt=normalizeHebrewNumbers(clean(quick.value)).replace(/,/g,' ');
 let toks=txt.split(/\s+/).filter(Boolean),added=[],bad=[];
@@ -696,13 +692,14 @@ import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/fireb
 const firebaseConfig={apiKey:"AIzaSyAkF2i0utPJayFqhzqWEmGh2hIUGhMJZ2o",authDomain:"healthylife-a054b.firebaseapp.com",projectId:"healthylife-a054b",storageBucket:"healthylife-a054b.firebasestorage.app",messagingSenderId:"307773262968",appId:"1:307773262968:web:7fdc12c7789f3d447ab18d"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let fbUser=null;
 function authMsg(t,ok=false){let e=document.getElementById('authStatus');if(e){e.textContent=t;e.className='notice '+(ok?'ok':'err')}}
+function setAuthUi(connected){let card=document.getElementById('firebaseAuthCard');if(card)card.classList.toggle('auth-connected',Boolean(connected))}
 window.registerUser=async(email,pw)=>{try{await createUserWithEmailAndPassword(auth,email,pw);authMsg('נרשמת',true)}catch(e){authMsg(e.message,false)}}
 window.loginUser=async(email,pw)=>{try{await signInWithEmailAndPassword(auth,email,pw)}catch(e){authMsg(e.message,false)}}
 window.resetPassword=async(email)=>{try{email=(email||'').trim();if(!email)throw new Error('הזן כתובת אימייל');await sendPasswordResetEmail(auth,email);authMsg('נשלח מייל לאיפוס סיסמה ל-'+email,true)}catch(e){authMsg('איפוס סיסמה: '+e.message,false)}}
 window.logoutUser=async()=>signOut(auth);
 window.cloudSave=()=>{clearTimeout(window.__saveT);window.__saveT=setTimeout(async()=>{if(!fbUser||typeof st==='undefined')return;await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})},900)}
 window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})}
-onAuthStateChanged(auth,async u=>{fbUser=u;if(!u){authMsg('לא מחובר',false);return}authMsg('מחובר: '+u.email,true);let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().data){Object.assign(st,snap.data().data);save();render()}else await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString()},{merge:true})});
+onAuthStateChanged(auth,async u=>{fbUser=u;setAuthUi(Boolean(u));if(!u){authMsg('לא מחובר',false);return}authMsg('מחובר: '+u.email,true);let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().data){Object.assign(st,snap.data().data);save();render()}else await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString()},{merge:true})});
 window.__cloudSaveHook=()=>{if(window.cloudSave)window.cloudSave()}
 </script>
 
