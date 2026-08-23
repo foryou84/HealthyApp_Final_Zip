@@ -61,12 +61,21 @@
   }
 
   async function subscribe(){
-    if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)){
-      throw new Error('המכשיר או הדפדפן אינם תומכים בהתראות אינטרנט.');
+    if(!('Notification' in window)){
+      throw new Error('ממשק ההתראות אינו זמין. יש לפתוח את האפליקציה מהסמל במסך הבית.');
+    }
+    if(!('serviceWorker' in navigator)){
+      throw new Error('שירות הרקע אינו זמין בדפדפן.');
     }
     if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!isStandalone()){
       throw new Error('באייפון יש לפתוח את האתר מהסמל שהוסף למסך הבית.');
     }
+
+    const registration=await navigator.serviceWorker.ready;
+    if(!registration.pushManager){
+      throw new Error('שירות ה-Push אינו זמין באפליקציה המותקנת.');
+    }
+
     const permission=await Notification.requestPermission();
     if(permission!=='granted')throw new Error('לא ניתנה הרשאה להתראות. אפשר לאשר אותה בהגדרות האייפון.');
 
@@ -74,7 +83,6 @@
     const config=await configResponse.json().catch(()=>({}));
     if(!configResponse.ok||!config.publicKey)throw new Error(config.error||'מפתחות ההתראות עדיין לא הוגדרו בשרת.');
 
-    const registration=await navigator.serviceWorker.ready;
     let subscription=await registration.pushManager.getSubscription();
     if(!subscription){
       subscription=await registration.pushManager.subscribe({
