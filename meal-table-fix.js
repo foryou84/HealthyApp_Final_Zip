@@ -664,7 +664,12 @@
     return items.map(({ entry, index }) => {
       const n = nutrition(entry || {});
       const amount = pick(entry.amount, entry.qty, entry.quantity, entry.grams, entry.weight);
-      const amountText = amount ? `${fmt(amount)} ${escapeHtml(entry.unit || 'ג׳')}` : '';
+      const enteredAmount = pick(entry.enteredAmount);
+      const enteredUnit = entry.enteredUnit;
+      const enteredLabels = { g: 'גרם/מ״ל', tsp: 'כפית', tbsp: 'כף', cup: 'כוס 200 מ״ל', unit: 'יחידה' };
+      const amountText = enteredAmount && enteredUnit
+        ? `${fmt(enteredAmount)} ${escapeHtml(enteredLabels[enteredUnit] || enteredUnit)} (≈ ${fmt(amount)} גרם/מ״ל)`
+        : (amount ? `${fmt(amount)} ${escapeHtml(entry.unit || 'ג׳')}` : '');
       const name = escapeHtml(entry.name || entry.food || 'פריט');
       return `<div class="meal-summary-item">
         <div class="meal-summary-item-top"><b>${name}</b>${amountText ? `<span>${amountText}</span>` : ''}</div>
@@ -733,6 +738,8 @@
       const ratio = next / current;
       entry[key] = next;
       scaleExistingNutrition(entry, ratio);
+      delete entry.enteredAmount;
+      delete entry.enteredUnit;
       persistState(state, previousEntries);
       lastSignature = '';
       renderMealJournalTable(true);
