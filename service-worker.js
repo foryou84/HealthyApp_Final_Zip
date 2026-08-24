@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v29-apple-health-steps';
+const CACHE_NAME='healthy-app-v30-numeric-macro-totals';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
