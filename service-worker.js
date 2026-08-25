@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v31-per-item-quantity-units';
+const CACHE_NAME='healthy-app-v32-clean-html-entry';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -26,6 +26,8 @@ async function htmlWithMealTable(request){
   if(!contentType.includes('text/html'))return response;
 
   let html=await response.text();
+  const doctypeIndex=html.toLowerCase().indexOf('<!doctype html>');
+  if(doctypeIndex>0)html=html.slice(doctypeIndex);
   if(!html.includes('meal-table-fix.js')){
     const tag='<script src="./meal-table-fix.js?v=20260819-8"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
