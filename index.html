@@ -194,12 +194,14 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="quick">
 <div class="suggest"><input id="quick" oninput="suggest()" placeholder="קוטג 3 כפות / קוטג 150 / חלב 200"><div id="sbox" class="suggestbox hide"></div></div>
 <button class="mic" onclick="voice()">🎙️</button>
-<button class="mic" onclick="document.getElementById('aiCamera').click()">📷</button>
-<button class="mic" onclick="document.getElementById('aiGallery').click()">🖼️</button>
-<input type="file" id="aiCamera" accept="image/*" capture="environment" class="hide" onchange="uploadImage(event,false)">
-<input type="file" id="aiGallery" accept="image/*" class="hide" onchange="uploadImage(event,false)">
+<button class="mic" title="צילום ארוחה" onclick="document.getElementById('aiCamera').click()">📷</button>
+<button class="mic" title="ארוחה מהגלריה" onclick="document.getElementById('aiGallery').click()">🖼️</button>
+<input type="file" id="aiCamera" accept="image/*" capture="environment" class="hide" onchange="uploadImage(event,'meal')">
+<input type="file" id="aiGallery" accept="image/*" class="hide" onchange="uploadImage(event,'meal')">
+<input type="file" id="labelImage" accept="image/*" class="hide" onchange="uploadImage(event,'label')">
 </div>
 <div class="grid2"><button id="quickAnalyzeBtn" onclick="analyzeQuickWithGemini()">בדוק עם Gemini</button><button style="background:#6b7280" onclick="clearAiReview()">נקה</button></div>
+<button style="background:#0f766e;margin-top:10px" onclick="document.getElementById('labelImage').click()">🏷️ סריקת תווית מוצר או אריזה</button>
 <div id="msg" class="notice hide"></div>
 <div id="aiEditBox" class="notice hide"></div><div class="notice" style="margin-top:8px"><b>📷 אין אפשרות לשקול?</b> צלם את הארוחה. Gemini יזהה מאכלים וכמויות, לאחר מכן תוצג השוואה מול ערכים שאישרת ומול MABAT. דבר לא יישמר לפני אישורך.</div>
 </div>
@@ -453,6 +455,23 @@ async function requestFoodAnalysis(text,imageDataUrl=null){
  let out=await callAiBackend(prompt,imageDataUrl,'gemini');
  return parseAiJson(out);
 }
+async function requestNutritionLabelAnalysis(imageDataUrl){
+ let prompt=`התמונה היא צילום של תווית תזונתית על מוצר ארוז. קרא רק את מה שמודפס על האריזה והחזר JSON חוקי בלבד בלי markdown.
+פורמט: [{"name":"שם המוצר כפי שמופיע באריזה","amount":100,"unit":"g","cal":123,"p":0,"c":26,"f":0,"v":0,"fromLabel":true,"labelBasis":"ל-100 גרם"}]
+כללים מחייבים:
+1. אל תחפש ואל תשתמש ב-MABAT, במאגר מזון או בידע כללי.
+2. העתק את הקלוריות, החלבון, הפחמימות והשומן מאותה עמודה בטבלה שעל האריזה.
+3. אם הערכים הם ל-100 גרם או ל-100 מ״ל, החזר amount=100 ו-unit="g".
+4. אם יש רק ערכים למנה, החזר את משקל המנה ב-amount ואת הערכים המדויקים למנה. אל תשתמש במשקל הכולל של האריזה ככמות שנאכלה.
+5. אין להעריך ערך שלא ניתן לקרוא. אם אחד מארבעת הערכים העיקריים או בסיס החישוב אינם קריאים, החזר [].
+6. v תמיד 0 אלא אם מצוין במפורש משקל ירקות. אל תוסיף הסבר.`;
+ let out=await callAiBackend(prompt,imageDataUrl,'gemini');
+ let items=parseAiJson(out).map(x=>({...x,fromLabel:true}));
+ if(!items.length)throw new Error('לא הצלחתי לקרוא את כל ערכי התווית. נסה צילום חד וישר יותר.');
+ let invalid=items.some(x=>!x.name||n(x.amount)<=0||[x.cal,x.p,x.c,x.f].some(v=>v===null||v===undefined||v===''));
+ if(invalid)throw new Error('חלק מערכי התווית אינם קריאים. לא נשמרו ערכים משוערים.');
+ return items;
+}
 function foodActual(base,grams){let q=grams/100;return{cal:n(base?.cal)*q,p:n(base?.p)*q,c:n(base?.c)*q,f:n(base?.f)*q,v:n(base?.v)*q}}
 function selectedComparisonFood(x){if(x.choice==='approved'&&x.approved)return x.approved;if(x.choice==='mabat'&&x.mabat)return x.mabat;return{name:x.aiName,u:'g',cal:n(x.aiPer100?.cal),p:n(x.aiPer100?.p),c:n(x.aiPer100?.c),f:n(x.aiPer100?.f),v:n(x.aiPer100?.v),w:0,src:x.fromLabel?'תווית היצרן':'Gemini'}}
 function comparisonUnit(x){return ['g','tsp','tbsp','cup','unit'].includes(x?.unit)?x.unit:'g'}
@@ -462,7 +481,7 @@ function comparisonGrams(x,useDraft=false){let amount=useDraft&&n(x?.draftAmount
 function comparisonAiActual(x){return foodActual(x.aiPer100||{},comparisonGrams(x))}
 function prepareAiComparison(items,photo=''){
  pendingAiPhoto=photo||'';
- pendingAiFoods=(items||[]).map((raw,i)=>{let amount=n(raw.amount)||100,unit=['g','tsp','tbsp','cup','unit'].includes(raw.unit)?raw.unit:'g',aiName=raw.name||'מזון',approved=findApprovedFood(aiName),mabatMatches=findMatches(aiName,50),mabat=mabatMatches[0]||null,reference=mabat||approved||findFood(aiName),grams=amount*(unit==='g'?1:(portionWeightForFood(reference,unit)||unitGram[unit]||1)),factor=grams>0?100/grams:1;return{id:i,aiName,amount,unit,aiPer100:{cal:n(raw.cal)*factor,p:n(raw.p)*factor,c:n(raw.c)*factor,f:n(raw.f)*factor,v:n(raw.v)*factor},approved,mabat,mabatMatches,choice:mabat?'mabat':(approved?'approved':'gemini'),fromLabel:!!raw.fromLabel}});
+ pendingAiFoods=(items||[]).map((raw,i)=>{let fromLabel=!!raw.fromLabel,amount=n(raw.amount)||100,unit=['g','tsp','tbsp','cup','unit'].includes(raw.unit)?raw.unit:'g',aiName=raw.name||'מזון',approved=fromLabel?null:findApprovedFood(aiName),mabatMatches=fromLabel?[]:findMatches(aiName,50),mabat=mabatMatches[0]||null,reference=mabat||approved||findFood(aiName),grams=amount*(unit==='g'?1:(portionWeightForFood(reference,unit)||unitGram[unit]||1)),factor=grams>0?100/grams:1;return{id:i,aiName,amount,unit,aiPer100:{cal:n(raw.cal)*factor,p:n(raw.p)*factor,c:n(raw.c)*factor,f:n(raw.f)*factor,v:n(raw.v)*factor},approved,mabat,mabatMatches,choice:fromLabel?'gemini':(mabat?'mabat':(approved?'approved':'gemini')),fromLabel,labelBasis:raw.labelBasis||''}});
  renderAiComparison();
  aiEditBox.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -470,13 +489,13 @@ function comparisonRow(label,ai,approved,mabat){return `<tr><td>${label}</td><td
 function renderAiComparison(){
  aiEditBox.classList.remove('hide');
  let photo=pendingAiPhoto?`<img class="compare-photo" src="${pendingAiPhoto}" alt="התמונה שנבדקה">`:'';
- aiEditBox.innerHTML=`<b>בדיקה ואישור</b><div class=small>בדוק את הכמות ואת התאמת MABAT. כשנמצאה התאמה, ערכי MABAT נבחרים אוטומטית.</div>${photo}`+pendingAiFoods.map((x,i)=>{
+ aiEditBox.innerHTML=`<b>בדיקה ואישור</b><div class=small>${pendingAiFoods.some(x=>x.fromLabel)?'בדוק את הכמות. בתווית מוצר הערכים מועתקים מהאריזה בלבד, בלי MABAT.':'בדוק את הכמות ואת התאמת MABAT. כשנמצאה התאמה, ערכי MABAT נבחרים אוטומטית.'}</div>${photo}`+pendingAiFoods.map((x,i)=>{
    let grams=comparisonGrams(x),ai=comparisonAiActual(x),a=x.approved?foodActual(x.approved,grams):null,m=x.mabat?foodActual(x.mabat,grams):null,chosen=selectedComparisonFood(x),actual=foodActual(chosen,grams);
    let source=x.choice==='mabat'?'MABAT':(x.choice==='approved'?'ערך שאושר בעבר':(x.fromLabel?'תווית היצרן':'Gemini'));
    let options=`<option value="gemini" ${x.choice==='gemini'?'selected':''}>Gemini</option>${x.approved?`<option value="approved" ${x.choice==='approved'?'selected':''}>ערך שאושר בעבר</option>`:''}${x.mabat?`<option value="mabat" ${x.choice==='mabat'?'selected':''}>MABAT</option>`:''}`;
    let mabatOptions=(x.mabatMatches||[]).map((f,j)=>`<option value="${j}" ${f===x.mabat?'selected':''}>${f.name} | ${r(f.cal)} קל׳, חלבון ${r(f.p)}, פחמימה ${r(f.c)}, שומן ${r(f.f)} ל-100</option>`).join('');
-   let mabatPicker=(x.mabatMatches||[]).length>1?`<label>בחר התאמת MABAT</label><select onchange="selectMabatMatch(${i},this.value)">${mabatOptions}</select>`:(x.mabat?`<div class="notice ok"><b>התאמת MABAT:</b> ${x.mabat.name}</div>`:'<div class="notice">לא נמצאה התאמה ב-MABAT. יישמר ערך Gemini.</div>');
-   let comparison=`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">מידע נוסף והשוואת מקורות</summary><label>החלף מקור ידנית</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',ai.c,a?.c,m?.c)}${comparisonRow('שומן',ai.f,a?.f,m?.f)}</table></details>`;
+   let mabatPicker=x.fromLabel?`<div class="notice ok"><b>מקור: תווית היצרן בלבד.</b> ${x.labelBasis?x.labelBasis+'. ':''}MABAT אינו בשימוש במסלול זה.</div>`:((x.mabatMatches||[]).length>1?`<label>בחר התאמת MABAT</label><select onchange="selectMabatMatch(${i},this.value)">${mabatOptions}</select>`:(x.mabat?`<div class="notice ok"><b>התאמת MABAT:</b> ${x.mabat.name}</div>`:'<div class="notice">לא נמצאה התאמה ב-MABAT. יישמר ערך Gemini.</div>'));
+   let comparison=x.fromLabel?`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">הערכים שנקראו מהאריזה</summary><table class=compare-table><tr><th>ערך לכמות</th><th>תווית היצרן</th></tr><tr><td>קלוריות</td><td>${r(ai.cal)}</td></tr><tr><td>חלבון</td><td>${r(ai.p)}</td></tr><tr><td>פחמימה</td><td>${r(ai.c)}</td></tr><tr><td>שומן</td><td>${r(ai.f)}</td></tr></table></details>`:`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">מידע נוסף והשוואת מקורות</summary><label>החלף מקור ידנית</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',ai.c,a?.c,m?.c)}${comparisonRow('שומן',ai.f,a?.f,m?.f)}</table></details>`;
    return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${source}</span></div><div class="compare-quantity-row"><div><label for="pendingAmount${i}">כמות</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="decimal" enterkeyhint="done" type="text" autocomplete="off" onclick="this.focus();this.select()" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"></div><div><label for="pendingUnit${i}">יחידה</label><select id="pendingUnit${i}" onchange="changePendingUnit(${i},this.value)">${Object.entries(unitName).map(([u,label])=>`<option value="${u}" ${comparisonUnit(x)===u?'selected':''}>${label}</option>`).join('')}</select></div><div><label>המרה</label><div class="compare-conversion">≈ ${r(grams)} גרם/מ״ל</div></div></div>${mabatPicker}<div class="notice ok" style="margin-top:10px"><b>יישמרו:</b> ${r(actual.cal)} קל׳ | חלבון ${r(actual.p)} | פחמימה ${r(actual.c)} | שומן ${r(actual.f)}</div>${comparison}</div>`;
  }).join('')+`<div class=compare-actions><button onclick="confirmAiFoods()">אשר והוסף ל-${st.currentMeal}</button><button style="background:#6b7280" onclick="clearAiReview()">בטל</button></div>`;
 }
@@ -494,13 +513,19 @@ function clearAiReview(){pendingAiFoods=[];pendingAiPhoto='';quick.value='';aiEd
 async function analyzeQuickWithGemini(){let text=(quick.value||'').trim();if(!text){msg('כתוב או אמור מה אכלת','err');return}let btn=document.getElementById('quickAnalyzeBtn');btn.classList.add('loading-btn');btn.textContent='Gemini בודק...';msg('Gemini מזהה את המאכל והכמות...','ok');try{prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}finally{btn.classList.remove('loading-btn');btn.textContent='בדוק עם Gemini'}}
 async function parseBulkWithAi(){let text=(bulkFoodText.value||quick.value||'').trim();if(!text){msg('אין טקסט לשליחה ל-Gemini','err');return}try{msg('Gemini מנתח...','ok');prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}}
 async function searchManualWithAi(){let text=`${mName.value} ${mAmount.value} ${unitName[mUnit.value]||mUnit.value}`;try{msg('Gemini בודק ולאחר מכן משווה למאגר...','ok');let arr=await requestFoodAnalysis(text);prepareAiComparison(arr)}catch(e){msg('Gemini נכשל: '+e.message,'err')}}
-async function uploadImage(e){
+async function uploadImage(e,mode='meal'){
  let file=e.target.files[0];if(!file)return;
  let dataUrl=await compressImage(file);
  try{
-   msg('Gemini בודק את התמונה...','ok');
-   prepareAiComparison(await requestFoodAnalysis('נתח את כל רכיבי הארוחה בתמונה',dataUrl),dataUrl);
-   msg('הצילום נותח. בדוק את ההשוואה ואשר לפני הוספה.','ok')
+   if(mode==='label'){
+     msg('Gemini קורא את תווית היצרן ישירות מהאריזה...','ok');
+     prepareAiComparison(await requestNutritionLabelAnalysis(dataUrl),dataUrl);
+     msg('התווית נקראה בלי MABAT. בדוק את הכמות ואשר לפני הוספה.','ok');
+   }else{
+     msg('Gemini בודק את הארוחה...','ok');
+     prepareAiComparison(await requestFoodAnalysis('נתח את כל רכיבי הארוחה בתמונה',dataUrl),dataUrl);
+     msg('הארוחה נותחה. בדוק את ההשוואה ואשר לפני הוספה.','ok');
+   }
  }catch(err){msg('AI נכשל: '+err.message,'err')}
  e.target.value='';
 }
