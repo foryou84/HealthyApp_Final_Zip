@@ -77,7 +77,12 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .compare-table{width:100%;border-collapse:collapse;margin-top:9px;font-size:12px}
 .compare-table th,.compare-table td{padding:7px 4px;border-bottom:1px solid var(--b);text-align:center}
 .compare-table th:first-child,.compare-table td:first-child{text-align:right}
-.compare-actions{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-top:10px}
+.compare-actions{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-top:10px}
+#aiMealTargetPicker{grid-column:1/-1;text-align:right;margin:0 0 10px;padding:14px;border:2px solid #cfe3ff;border-radius:18px;background:#f8fbff}
+.ai-meal-target-choices{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:10px}
+.ai-meal-target-choices button{margin:0;min-height:50px;padding:7px 4px;background:#eef3fb;color:#243b7a;border:2px solid #d8e2f2;font-size:16px}
+.ai-meal-target-choices button.on{background:#0a84ff;color:#fff;border-color:#0a84ff}
+@media(max-width:390px){.compare-actions{grid-template-columns:1fr 1fr}.compare-actions>button:first-of-type{grid-column:1/-1}}
 .compare-photo{width:100%;max-height:190px;object-fit:cover;border-radius:14px;margin:8px 0}
 .loading-btn{opacity:.65;pointer-events:none}
 .amount-stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px}
@@ -359,8 +364,12 @@ function closeAppKeyboard(){let el=document.getElementById('appKeyboard');if(el)
 function saveAppKeyboard(){let cb=appKeyboardSave,val=appKeyboardValue.trim();closeAppKeyboard();if(cb)cb(val)}
 function editManualFoodName(){openAppKeyboard('עריכת שם המאכל',mName.value,'text',val=>{if(val)mName.value=val})}
 function save(){localStorage.setItem(KEY,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
-function show(p){document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render()}
-function setMeal(m,el){st.currentMeal=m;document.querySelectorAll('.meal-chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');save()}
+function mealForCurrentTime(){let h=new Date().getHours();if(h>=4&&h<11)return 'בוקר';if(h>=11&&h<16)return 'צהריים';if(h>=16&&h<21)return 'ערב';return 'ביניים'}
+function syncMealChips(){document.querySelectorAll('.meal-chip').forEach(c=>c.classList.toggle('on',c.textContent.trim()===st.currentMeal))}
+function show(p){if(p==='Food'&&!pendingAiFoods.length){st.currentMeal=mealForCurrentTime();save()}document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render();if(p==='Food')syncMealChips()}
+function setMeal(m,el){st.currentMeal=m;syncMealChips();if(el)el.classList.add('on');save()}
+function setAiTargetMeal(m){setMeal(m);renderAiComparison()}
+function toggleAiMealTargetPicker(){let picker=document.getElementById('aiMealTargetPicker'),button=document.getElementById('changeAiMealButton');if(!picker)return;picker.hidden=!picker.hidden;if(button)button.setAttribute('aria-expanded',picker.hidden?'false':'true')}
 function totals(){return (st.entries||[]).reduce((a,e)=>(a.cal+=n(e.cal),a.p+=n(e.p),a.c+=n(e.c),a.f+=n(e.f),a.v+=n(e.v),a.w+=n(e.w),a),{cal:0,p:0,c:0,f:0,v:0,w:0})}
 function bar(label,val,target){let pct=Math.min(100,target?val/target*100:0);return `<div class=row><span>${label}</span><span>נאכל ${r(val)} מתוך ${r(target)}</span></div><div class=bar><div class=fill style="width:${pct}%"></div></div>`}
 function healthDayDate(){let d=new Date();if(d.getHours()<4)d.setDate(d.getDate()-1);return d}
@@ -416,10 +425,16 @@ function portionWeightForFood(f,unit){
   return f.gpu?.[unit]||null;
 }
 function defaultReadyFoodBonus(q,f){
-  let s=clean(f.name), qq=clean(q);
-  if(/יבש|לא מבושל|לפני בישול|נא/.test(qq)) return /יבש|לא מבושל|נא/.test(s)?500:0;
-  if(/מבושל|מוכן/.test(qq)) return /מבושל|מוכן/.test(s)?500:0;
-  return /מבושל|מוכן לאכילה/.test(s)?120:0;
+  let s=clean([f.name,...(f.a||[])].join(' ')),qq=clean(q);
+  let queryCooked=/מבושל|מבושלת|במים|מוכן|מוכנה/.test(qq);
+  let queryDry=/יבש|יבשה|לא מבושל|לא מבושלת|לפני בישול|נא/.test(qq);
+  let foodCooked=/מבושל|מבושלת|במים|מוכן לאכילה|מוכנה לאכילה/.test(s);
+  let foodDry=/יבש|יבשה|לא מבושל|לא מבושלת|לפני בישול|נא/.test(s);
+  if(queryCooked&&foodDry)return -10000;
+  if(queryDry&&foodCooked)return -10000;
+  if(queryCooked&&foodCooked)return 5000;
+  if(queryDry&&foodDry)return 5000;
+  return foodCooked?120:0;
 }
 function findFood(q){let list=allFoods().map(f=>{let lexical=betterScoreFood(q,f);return{f,lexical,score:lexical>0?lexical+defaultReadyFoodBonus(q,f):lexical}}).filter(x=>x.lexical>0).sort((a,b)=>b.score-a.score);return list[0]?.f||null}
 function findMatches(q,limit=8){return allFoods().map(f=>{let lexical=betterScoreFood(q,f);return{f,lexical,score:lexical>0?lexical+defaultReadyFoodBonus(q,f):lexical}}).filter(x=>x.lexical>0).sort((a,b)=>b.score-a.score).slice(0,limit).map(x=>x.f)}
@@ -498,7 +513,7 @@ function renderAiComparison(){
    let mabatPicker=x.fromLabel?`<div class="notice ok"><b>מקור: תווית היצרן בלבד.</b> ${x.labelBasis?x.labelBasis+'. ':''}MABAT אינו בשימוש במסלול זה.</div>`:((x.mabatMatches||[]).length>1?`<label>בחר התאמת MABAT</label><select onchange="selectMabatMatch(${i},this.value)">${mabatOptions}</select>`:(x.mabat?`<div class="notice ok"><b>התאמת MABAT:</b> ${x.mabat.name}</div>`:'<div class="notice">לא נמצאה התאמה ב-MABAT. יישמר ערך Gemini.</div>'));
    let comparison=x.fromLabel?`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">הערכים שנקראו מהאריזה</summary><table class=compare-table><tr><th>ערך לכמות</th><th>תווית היצרן</th></tr><tr><td>קלוריות</td><td>${r(ai.cal)}</td></tr><tr><td>חלבון</td><td>${r(ai.p)}</td></tr><tr><td>פחמימה</td><td>${r(ai.c)}</td></tr><tr><td>שומן</td><td>${r(ai.f)}</td></tr></table></details>`:`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">מידע נוסף והשוואת מקורות</summary><label>החלף מקור ידנית</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',ai.c,a?.c,m?.c)}${comparisonRow('שומן',ai.f,a?.f,m?.f)}</table></details>`;
    return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${source}</span></div><div class="compare-quantity-row"><div><label for="pendingAmount${i}">כמות</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="decimal" enterkeyhint="done" type="text" autocomplete="off" onclick="this.focus();this.select()" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"></div><div><label for="pendingUnit${i}">יחידה</label><select id="pendingUnit${i}" onchange="changePendingUnit(${i},this.value)">${Object.entries(unitName).map(([u,label])=>`<option value="${u}" ${comparisonUnit(x)===u?'selected':''}>${label}</option>`).join('')}</select></div><div><label>המרה</label><div class="compare-conversion">≈ ${r(grams)} גרם/מ״ל</div></div></div>${mabatPicker}<div class="notice ok" style="margin-top:10px"><b>יישמרו:</b> ${r(actual.cal)} קל׳ | חלבון ${r(actual.p)} | פחמימה ${r(actual.c)} | שומן ${r(actual.f)}</div>${comparison}</div>`;
- }).join('')+`<div class=compare-actions><button onclick="confirmAiFoods()">אשר והוסף ל-${st.currentMeal}</button><button style="background:#6b7280" onclick="clearAiReview()">בטל</button></div>`;
+ }).join('')+`<div class=compare-actions><div id="aiMealTargetPicker" hidden><b style="font-size:20px">לאן לשמור?</b><div class="ai-meal-target-choices">${['בוקר','צהריים','ערב','ביניים'].map(meal=>`<button type="button" class="${meal===st.currentMeal?'on':''}" onclick="setAiTargetMeal('${meal}')">${meal}</button>`).join('')}</div><div class="small" style="margin-top:9px">ברירת המחדל נקבעת לפי השעה. אפשר לשנות לפני השמירה.</div></div><button id="confirmAiFoodsButton" onclick="confirmAiFoods()">אשר והוסף ל-${st.currentMeal}</button><button id="changeAiMealButton" type="button" aria-controls="aiMealTargetPicker" aria-expanded="false" style="background:#eef3fb;color:#243b7a;border:2px solid #c9d8ee" onclick="toggleAiMealTargetPicker()">שנה ארוחה</button><button style="background:#6b7280" onclick="clearAiReview()">בטל</button></div>`;
 }
 function updateAiAmount(i,val){let x=pendingAiFoods[i],nu=n(val);if(!x||nu<=0)return;x.amount=nu;delete x.draftAmount;renderAiComparison()}
 function previewPendingAmount(i,val){let nu=n(val);if(nu>0)pendingAiFoods[i].draftAmount=nu}
