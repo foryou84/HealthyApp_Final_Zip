@@ -1140,8 +1140,10 @@
     const decorateAiMealTarget = () => {
       const actions = document.querySelector('#aiEditBox .compare-actions');
       if (!actions) return;
+      actions.style.gridTemplateColumns = '2fr 1fr 1fr';
 
-      const confirmButton = Array.from(actions.children).find(element => element.tagName === 'BUTTON');
+      const directButtons = Array.from(actions.children).filter(element => element.tagName === 'BUTTON');
+      const confirmButton = directButtons[0];
       if (confirmButton) {
         confirmButton.id = 'confirmAiFoodsButton';
         confirmButton.textContent = `אשר והוסף ל-${targetMeal}`;
@@ -1151,6 +1153,7 @@
       if (!picker) {
         picker = document.createElement('div');
         picker.id = 'aiMealTargetPicker';
+        picker.hidden = true;
         picker.style.cssText = 'grid-column:1/-1;text-align:right;margin:0 0 10px;padding:14px;border:2px solid #cfe3ff;border-radius:18px;background:#f8fbff';
         const title = document.createElement('div');
         title.textContent = 'לאן לשמור?';
@@ -1163,7 +1166,12 @@
           button.dataset.targetMeal = meal;
           button.textContent = meal;
           button.style.cssText = 'min-height:50px;padding:7px 4px;border:2px solid #d8e2f2;border-radius:16px;font-size:16px;font-weight:900';
-          button.addEventListener('click', () => setTargetMeal(meal, true));
+          button.addEventListener('click', () => {
+            setTargetMeal(meal, true);
+            picker.hidden = true;
+            const changeButton = document.getElementById('changeAiMealButton');
+            if (changeButton) changeButton.setAttribute('aria-expanded', 'false');
+          });
           choices.appendChild(button);
         });
         const hint = document.createElement('div');
@@ -1172,6 +1180,25 @@
         picker.append(title, choices, hint);
         actions.prepend(picker);
       }
+
+      let changeButton = document.getElementById('changeAiMealButton');
+      if (!changeButton) {
+        changeButton = document.createElement('button');
+        changeButton.id = 'changeAiMealButton';
+        changeButton.type = 'button';
+        changeButton.textContent = 'שנה ארוחה';
+        changeButton.setAttribute('aria-controls', 'aiMealTargetPicker');
+        changeButton.setAttribute('aria-expanded', 'false');
+        changeButton.style.cssText = 'background:#eef3fb;color:#243b7a;border:2px solid #c9d8ee;font-weight:900';
+        changeButton.addEventListener('click', () => {
+          picker.hidden = !picker.hidden;
+          changeButton.setAttribute('aria-expanded', picker.hidden ? 'false' : 'true');
+          if (!picker.hidden) picker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        if (confirmButton) confirmButton.insertAdjacentElement('afterend', changeButton);
+        else actions.appendChild(changeButton);
+      }
+
       refreshMealTargetUi();
     };
 
