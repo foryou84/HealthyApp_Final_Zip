@@ -1085,64 +1085,151 @@
     if (explanation) explanation.textContent = 'שמור את הארוחה הנוכחית. אם עדיין לא הוספת אותה ליומן, המאכל שמוצג במחשבון יישמר כארוחה קבועה.';
   }
 
+  function mealForCurrentTime(date = new Date()) {
+    const minutes = date.getHours() * 60 + date.getMinutes();
+    if (minutes >= 4 * 60 && minutes < 11 * 60) return 'בוקר';
+    if (minutes >= 11 * 60 && minutes < 16 * 60) return 'צהריים';
+    if (minutes >= 16 * 60 && minutes < 21 * 60) return 'ערב';
+    return 'ביניים';
+  }
+
   function installAiMealTargetPicker() {
     if (window.__aiMealTargetPicker || typeof window.renderAiComparison !== 'function' || typeof window.confirmAiFoods !== 'function') return;
 
-    let targetMeal = MEALS.includes(st.currentMeal) ? st.currentMeal : 'בוקר';
+    let targetMeal = mealForCurrentTime();
+    let manualOverride = false;
     const originalPrepare = typeof window.prepareAiComparison === 'function' ? window.prepareAiComparison : null;
     const originalRender = window.renderAiComparison;
     const originalConfirm = window.confirmAiFoods;
+    const originalSetMeal = typeof window.setMeal === 'function' ? window.setMeal : null;
+    const originalShow = typeof window.show === 'function' ? window.show : null;
 
-    if (originalPrepare) {
-      window.prepareAiComparison = function prepareComparisonWithMealTarget(...args) {
-        targetMeal = MEALS.includes(st.currentMeal) ? st.currentMeal : 'בוקר';
-        return originalPrepare.apply(this, args);
-      };
-    }
-
-    window.setAiTargetMeal = meal => {
-      if (!MEALS.includes(meal)) return;
-      targetMeal = meal;
-      const button = document.getElementById('confirmAiFoodsButton');
-      if (button) button.textContent = `אשר והוסף ל-${targetMeal}`;
+    const syncMealChips = () => {
+      document.querySelectorAll('.meal-chip').forEach(chip => {
+        const meal = MEALS.find(item => chip.textContent.trim().includes(item));
+        chip.classList.toggle('on', meal === targetMeal);
+      });
     };
 
-    window.renderAiComparison = function renderComparisonWithMealTarget(...args) {
-      const result = originalRender.apply(this, args);
-      const actions = document.querySelector('#aiEditBox .compare-actions');
-      if (!actions) return result;
+    const refreshMealTargetUi = () => {
+      syncMealChips();
+      const confirmButton = document.getElementById('confirmAiFoodsButton');
+      if (confirmButton) confirmButton.textContent = `אשר והוסף ל-${targetMeal}`;
+      document.querySelectorAll('#aiMealTargetPicker [data-target-meal]').forEach(button => {
+        const selected = button.dataset.targetMeal === targetMeal;
+        button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+        button.style.background = selected ? '#0b7cff' : '#eef3fb';
+        button.style.color = selected ? '#fff' : '#243b7a';
+        button.style.borderColor = selected ? '#0b7cff' : '#d8e2f2';
+      });
+      const automatic = document.getElementById('aiMealAutomaticHint');
+      if (automatic) automatic.textContent = manualOverride
+        ? `נבחר ידנית: ${targetMeal}. אפשר לשנות לפני השמירה.`
+        : `נבחר אוטומטית לפי השעה: ${targetMeal}. אפשר לשנות לפני השמירה.`;
+    };
 
-      const confirmButton = actions.querySelector('button');
+    const setTargetMeal = (meal, manual = false, persist = true) => {
+      if (!MEALS.includes(meal)) return;
+      targetMeal = meal;
+      st.currentMeal = meal;
+      if (manual) manualOverride = true;
+      refreshMealTargetUi();
+      if (persist && typeof save === 'function') save();
+    };
+
+    const decorateAiMealTarget = () => {
+      const actions = document.querySelector('#aiEditBox .compare-actions');
+      if (!actions) return;
+
+      const confirmButton = Array.from(actions.children).find(element => element.tagName === 'BUTTON');
       if (confirmButton) {
         confirmButton.id = 'confirmAiFoodsButton';
         confirmButton.textContent = `אשר והוסף ל-${targetMeal}`;
       }
 
-      if (!document.getElementById('aiMealTargetPicker')) {
-        const picker = document.createElement('div');
+      let picker = document.getElementById('aiMealTargetPicker');
+      if (!picker) {
+        picker = document.createElement('div');
         picker.id = 'aiMealTargetPicker';
-        picker.style.cssText = 'grid-column:1/-1;text-align:right;margin-bottom:2px';
-        const label = document.createElement('label');
-        label.htmlFor = 'aiMealTargetSelect';
-        label.textContent = 'לאיזו ארוחה להוסיף?';
-        label.style.cssText = 'display:block;font-weight:900;margin:0 0 6px';
-        const select = document.createElement('select');
-        select.id = 'aiMealTargetSelect';
-        select.style.cssText = 'width:100%;font-size:18px;font-weight:800';
-        MEALS.forEach(meal => select.add(new Option(meal, meal, false, meal === targetMeal)));
-        select.addEventListener('change', () => window.setAiTargetMeal(select.value));
-        picker.append(label, select);
+        picker.style.cssText = 'grid-column:1/-1;text-align:right;margin:0 0 10px;padding:14px;border:2px solid #cfe3ff;border-radius:18px;background:#f8fbff';
+        const title = document.createElement('div');
+        title.textContent = 'לאן לשמור?';
+        title.style.cssText = 'font-size:20px;font-weight:900;margin-bottom:10px';
+        const choices = document.createElement('div');
+        choices.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:7px';
+        MEALS.forEach(meal => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.dataset.targetMeal = meal;
+          button.textContent = meal;
+          button.style.cssText = 'min-height:50px;padding:7px 4px;border:2px solid #d8e2f2;border-radius:16px;font-size:16px;font-weight:900';
+          button.addEventListener('click', () => setTargetMeal(meal, true));
+          choices.appendChild(button);
+        });
+        const hint = document.createElement('div');
+        hint.id = 'aiMealAutomaticHint';
+        hint.style.cssText = 'margin-top:9px;color:#697386;font-size:14px;font-weight:700';
+        picker.append(title, choices, hint);
         actions.prepend(picker);
       }
+      refreshMealTargetUi();
+    };
+
+    window.setAiTargetMeal = meal => setTargetMeal(meal, true);
+
+    if (originalSetMeal) {
+      window.setMeal = function setMealAndTarget(meal, element) {
+        if (MEALS.includes(meal)) {
+          targetMeal = meal;
+          manualOverride = true;
+        }
+        const result = originalSetMeal.apply(this, arguments);
+        if (MEALS.includes(meal)) setTargetMeal(meal, true, false);
+        return result;
+      };
+    }
+
+    if (originalShow) {
+      window.show = function showWithAutomaticMeal(page) {
+        if (page === 'Food' && !(typeof pendingAiFoods !== 'undefined' && pendingAiFoods.length)) {
+          manualOverride = false;
+          setTargetMeal(mealForCurrentTime(), false);
+        }
+        const result = originalShow.apply(this, arguments);
+        if (page === 'Food') setTimeout(refreshMealTargetUi, 0);
+        return result;
+      };
+    }
+
+    if (originalPrepare) {
+      window.prepareAiComparison = function prepareComparisonWithMealTarget() {
+        if (!manualOverride) setTargetMeal(mealForCurrentTime(), false);
+        else if (MEALS.includes(st.currentMeal)) targetMeal = st.currentMeal;
+        const result = originalPrepare.apply(this, arguments);
+        setTimeout(decorateAiMealTarget, 0);
+        return result;
+      };
+    }
+
+    window.renderAiComparison = function renderComparisonWithMealTarget() {
+      const result = originalRender.apply(this, arguments);
+      decorateAiMealTarget();
       return result;
     };
 
-    window.confirmAiFoods = function confirmFoodsInSelectedMeal(...args) {
+    window.confirmAiFoods = async function confirmFoodsInSelectedMeal() {
       st.currentMeal = targetMeal;
-      const result = originalConfirm.apply(this, args);
-      if (typeof save === 'function') save();
+      const result = await originalConfirm.apply(this, arguments);
+      manualOverride = false;
       return result;
     };
+
+    if (typeof pendingAiFoods !== 'undefined' && pendingAiFoods.length) {
+      targetMeal = MEALS.includes(st.currentMeal) ? st.currentMeal : mealForCurrentTime();
+      decorateAiMealTarget();
+    } else {
+      setTargetMeal(mealForCurrentTime(), false);
+    }
 
     window.__aiMealTargetPicker = true;
   }
