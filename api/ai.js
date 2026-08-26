@@ -30,27 +30,41 @@ module.exports = async function handler(req, res) {
       parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
     }
 
-    const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts }] })
-      }
-    );
+    const models = [...new Set([
+      process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+      'gemini-3.5-flash-lite',
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash'
+    ].filter(Boolean).map(model => String(model).trim()))];
+    let lastError;
 
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || d.error) {
+    for (const model of models) {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts }] })
+        }
+      );
+
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && !d.error) {
+        const text = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim() || '';
+        if (text) return text;
+        lastError = new Error('Gemini returned no text');
+        continue;
+      }
+
       const msg = d?.error?.message || `Gemini HTTP ${r.status}`;
       const err = new Error(msg);
       err.status = r.status;
-      throw err;
+      lastError = err;
+      const modelNotFound = r.status === 404 || /not found|can not be found|cannot be found|object.*found/i.test(msg);
+      if (!modelNotFound) throw err;
     }
 
-    const text = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim() || '';
-    if (!text) throw new Error('Gemini returned no text');
-    return text;
+    throw lastError || new Error('Gemini request failed');
   }
 
   async function openai() {
