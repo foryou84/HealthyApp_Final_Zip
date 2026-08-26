@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v40-visible-comparison';
+const CACHE_NAME='healthy-app-v41-mobile-meal-layout';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
@@ -29,7 +29,7 @@ async function htmlWithMealTable(request){
   const doctypeIndex=html.toLowerCase().indexOf('<!doctype html>');
   if(doctypeIndex>0)html=html.slice(doctypeIndex);
   if(!html.includes('meal-table-fix.js')){
-    const tag='<script src="./meal-table-fix.js?v=20260826-5"></script>';
+    const tag='<script src="./meal-table-fix.js?v=20260826-6"></script>';
     html=html.includes('</body>')?html.replace('</body>',tag+'</body>'):html+tag;
   }
 
