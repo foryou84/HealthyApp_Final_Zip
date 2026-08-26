@@ -548,12 +548,62 @@
     return MEALS.includes(value) ? value : 'ביניים';
   };
 
+  const vegetableName = entry => String((entry && (entry.name || entry.food || entry.title)) || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0591-\u05c7]/g, '')
+    .replace(/[״"'׳]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Count only foods that are clearly vegetables. Starchy foods remain in
+  // carbohydrates and are deliberately excluded from the 500g vegetable goal.
+  const vegetableStarts = [
+    /^(?:מלפפון|מלפפונים)(?:\s|$)/,
+    /^(?:עגבניה|עגבניות|עגבנית|עגבניית|עגבניית שרי|שרי)(?:\s|$)/,
+    /^(?:גזר|גזרים)(?:\s|$)/,
+    /^(?:בצל|בצלים|בצל ירוק)(?:\s|$)/,
+    /^(?:חסה|עלי חסה)(?:\s|$)/,
+    /^(?:פלפל|פלפלים|גמבה)(?:\s|$)/,
+    /^(?:קישוא|קישואים|זוקיני)(?:\s|$)/,
+    /^(?:חציל|חצילים)(?:\s|$)/,
+    /^(?:כרוב|כרובית|ברוקולי)(?:\s|$)/,
+    /^(?:צנון|צנונית|סלרי|שומר|קולרבי|קולורבי)(?:\s|$)/,
+    /^(?:פטריה|פטריות|סלק|אספרגוס|ארטישוק|דלעת|לפת|במיה)(?:\s|$)/,
+    /^(?:תרד|מנגולד|רוקט|ארוגולה|נבטים|שעועית ירוקה)(?:\s|$)/,
+    /^(?:ירק|ירקות)(?:\s|$)/,
+    /^(?:סלט ירקות|סלט ישראלי|סלט קצוץ|סלט חסה)(?:\s|$)/
+  ];
+  const starchyVegetableNames = /(?:תפוח(?:י)? אדמה|בטטה|תירס|אפונה|חומוס|עדשים|שעועית (?!ירוקה)|אבוקדו|זית(?:ים)?)/;
+
+  const inferredVegetableGrams = entry => {
+    const explicit = pick(entry?.v, entry?.veg, entry?.vegetables, entry?.vegetable, entry?.vegG);
+    if (explicit > 0) return explicit;
+    const name = vegetableName(entry);
+    const amount = pick(entry?.amount, entry?.grams, entry?.weight, entry?.qty, entry?.quantity);
+    if (!(amount > 0) || !name || starchyVegetableNames.test(name)) return 0;
+    return vegetableStarts.some(pattern => pattern.test(name)) ? amount : 0;
+  };
+
+  const backfillVegetableGrams = entries => {
+    let changed = false;
+    (entries || []).forEach(entry => {
+      if (!entry || pick(entry.v, entry.veg, entry.vegetables, entry.vegetable, entry.vegG) > 0) return;
+      const grams = inferredVegetableGrams(entry);
+      if (grams > 0) {
+        entry.v = grams;
+        changed = true;
+      }
+    });
+    return changed;
+  };
+
   const nutrition = entry => ({
     cal: pick(entry.cal, entry.kcal, entry.calories, entry.energy),
     p: pick(entry.p, entry.protein, entry.proteinG),
     c: pick(entry.c, entry.carbs, entry.carb, entry.carbohydrates),
     f: pick(entry.f, entry.fat, entry.fatG),
-    v: pick(entry.v, entry.veg, entry.vegetables, entry.vegetable, entry.vegG)
+    v: inferredVegetableGrams(entry)
   });
 
   const sumEntries = entries => (entries || []).reduce((sum, entry) => {
@@ -757,6 +807,8 @@
     if (!box || !state) return;
 
     const entries = Array.isArray(state.entries) ? state.entries : [];
+    const previousEntries = entries.map(entry => ({ ...entry }));
+    if (backfillVegetableGrams(entries)) persistState(state, previousEntries);
     const target = getTarget(state);
     const signature = JSON.stringify([entries, target]);
     if (!force && signature === lastSignature && box.querySelector('.meal-summary-table')) return;
