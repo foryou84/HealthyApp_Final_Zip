@@ -553,6 +553,8 @@
     .normalize('NFKD')
     .replace(/[\u0591-\u05c7]/g, '')
     .replace(/[״"'׳]/g, '')
+    .replace(/^\s*(?:ffq|mabat)\s*[-_:]*\s*/i, '')
+    .replace(/[\-_,;:()[\]{}\/\\]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
