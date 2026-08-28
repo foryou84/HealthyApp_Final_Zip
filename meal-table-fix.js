@@ -372,7 +372,12 @@
     const originalFoodScore = window.betterScoreFood;
     const cleanFoodText = value => String(value || '').toLowerCase()
       .replace(/["׳״'`.,:;!?()\[\]{}\/\\_-]/g, ' ').replace(/\s+/g, ' ').trim();
-    const foodToken = word => ({ אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן' }[word] || word);
+    const foodToken = word => ({
+      אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן',
+      תפוחי: 'תפוח', תפוחים: 'תפוח',
+      אפויים: 'אפוי', אפויה: 'אפוי', אפויות: 'אפוי',
+      מבושלים: 'מבושל', מבושלת: 'מבושל', מבושלות: 'מבושל'
+    }[word] || word);
     window.betterScoreFood = function specificFoodScore(query, food) {
       const baseScore = originalFoodScore(query, food);
       if (baseScore < 0 || !food) return baseScore;
@@ -386,7 +391,16 @@
       // Prefer the food itself ("ריבה, כל הטעמים") over a compound product
       // that merely contains it ("עוגיות במילוי ריבה").
       const leadingFoodBonus = names.some(name => name === cleanQuery || name.startsWith(cleanQuery + ' ')) ? 1500 : 0;
-      return baseScore + normalizedExtra + varietyBonus + leadingFoodBonus;
+      const preparationTokens = new Set(['אפוי', 'מבושל', 'מטוגן', 'מאודה', 'צלוי', 'טרי', 'יבש']);
+      const queryCore = queryWords.filter(word => !preparationTokens.has(word));
+      const leadingCoreBonus = names.some(name => {
+        const tokens = name.split(/\s+/).filter(Boolean).map(foodToken);
+        return queryCore.length && queryCore.every((word, index) => tokens[index] === word);
+      }) ? 2500 : 0;
+      const requestedPreparation = queryWords.find(word => preparationTokens.has(word));
+      const preparationBonus = requestedPreparation && nameWords.includes(requestedPreparation) ? 1200 : 0;
+      const noAddedFatBonus = requestedPreparation === 'אפוי' && names.some(name => /ללא תוספת שומן|ללא שמן/.test(name)) ? 700 : 0;
+      return baseScore + normalizedExtra + varietyBonus + leadingFoodBonus + leadingCoreBonus + preparationBonus + noAddedFatBonus;
     };
     window.__specificFoodScoreFix = true;
   }
@@ -398,7 +412,10 @@
     // matches. It must never introduce unrelated cooked foods into the list.
     const coreClean = value => String(value || '').toLowerCase()
       .replace(/["׳״'`.,:;!?()\[\]{}\/\\_-]/g, ' ').replace(/\s+/g, ' ').trim();
-    const coreFoodToken = word => ({ אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן' }[word] || word);
+    const coreFoodToken = word => ({
+      אגוזי: 'אגוז', אגוזים: 'אגוז', שקדים: 'שקד', בוטנים: 'בוטן',
+      תפוחי: 'תפוח', תפוחים: 'תפוח'
+    }[word] || word);
     const preparationWords = new Set(['עם','בלי','ללא','של','או','ו','מבושל','מבושלים','מבושלת','מבושלות','מוכן','מוכנים','מוכנה','טרי','טריים','טריה','טריות','מטוגן','מטוגנים','מטוגנת','אפוי','אפויים','אפויה','מאודה','מאודים','מאודה','במים','מים','בשמן','שמן','מלח','קפוא','קפואים','קפואה','מסונן','מסוננת','אחוז','אחוזים']);
     const percentValue = value => {
       const text = String(value || '').toLowerCase();

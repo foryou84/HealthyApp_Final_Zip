@@ -23,3 +23,4 @@ Deploy:
 - In Vercel > Project Settings > Environment Variables, add the two variables above.
 - Redeploy.
 - Open Profile > AI connection and press "Test Gemini" and "Test ChatGPT".
+3. USDA_API_KEY = מפתח חינמי של USDA FoodData Central. בלי המפתח יפעל DEMO_KEY מוגבל לבדיקה בלבד.

@@ -288,7 +288,8 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="card">
 <h2>📅 ניתוח היסטורי</h2>
 <div class="calc-mode">
-<button class="mode-btn active" onclick="setRange('month',this)">חודש</button>
+<button class="mode-btn active" onclick="setRange('week',this)">שבוע</button>
+<button class="mode-btn" onclick="setRange('month',this)">חודש</button>
 <button class="mode-btn" onclick="setRange('quarter',this)">3 חודשים</button>
 <button class="mode-btn" onclick="setRange('year',this)">שנה</button>
 </div>
@@ -327,7 +328,7 @@ const KEY='healthy_life_fixed_dual_calc_v1';
 const base={profile:{age:63,weight:83.5,height:174,goalWeight:78,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
 let st=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(base);
 let manualMode='serving';
-let analysisRange='month';
+let analysisRange='week';
 
 const MABAT_EMBEDDED=[].concat(window.MABAT_CHUNK_1,window.MABAT_CHUNK_2,window.MABAT_CHUNK_3,window.MABAT_CHUNK_4,window.MABAT_CHUNK_5,window.MABAT_CHUNK_6,window.MABAT_CHUNK_7,window.MABAT_CHUNK_8);
 const foods=[
@@ -355,6 +356,7 @@ const unitName={g:'גרם/מ״ל',cup:'כוס 200 מ״ל',tbsp:'כף',tsp:'כפ�
 function n(x){return Number(String(x||'').replace(',','.'))||0}
 function r(x){return Math.round((x||0)*10)/10}
 function clean(s){return String(s||'').toLowerCase().replace(/[״׳'"]/g,'').trim()}
+function escapeHtml(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
 let appKeyboardValue='',appKeyboardSave=null;
 function ensureAppKeyboard(){
  if(document.getElementById('appKeyboard'))return;
@@ -408,7 +410,7 @@ function betterScoreFood(q,f){
   // Treat common singular/plural food forms as the same token. This prevents a
   // specific query such as "אגוז לוז" from losing to a generic "אגוז מבושל"
   // merely because the MABAT record spells the category as "אגוזי לוז".
-  const foodToken=w=>({אגוזי:'אגוז',אגוזים:'אגוז',שקדים:'שקד',בוטנים:'בוטן'}[w]||w);
+  const foodToken=w=>({אגוזי:'אגוז',אגוזים:'אגוז',שקדים:'שקד',בוטנים:'בוטן',תפוחי:'תפוח',תפוחים:'תפוח',אפויים:'אפוי',אפויה:'אפוי',אפויות:'אפוי',מבושלים:'מבושל',מבושלת:'מבושל',מבושלות:'מבושל'}[w]||w);
   let words=q.split(/\s+/).filter(Boolean).map(foodToken);
   let nameWords=names.map(x=>x.split(/\s+/).filter(Boolean).map(foodToken));
   let hit=words.filter(w=>nameWords.some(ws=>ws.includes(w))).length;
@@ -494,7 +496,7 @@ async function requestNutritionLabelAnalysis(imageDataUrl){
  return items;
 }
 function foodActual(base,grams){let q=grams/100;return{cal:n(base?.cal)*q,p:n(base?.p)*q,c:n(base?.c)*q,f:n(base?.f)*q,v:n(base?.v)*q}}
-function selectedComparisonFood(x){if(x.choice==='approved'&&x.approved)return x.approved;if(x.choice==='mabat'&&x.mabat)return x.mabat;return{name:x.aiName,u:'g',cal:n(x.aiPer100?.cal),p:n(x.aiPer100?.p),c:n(x.aiPer100?.c),f:n(x.aiPer100?.f),v:n(x.aiPer100?.v),w:0,src:x.fromLabel?'תווית היצרן':'Gemini'}}
+function selectedComparisonFood(x){if(x.choice==='approved'&&x.approved)return x.approved;if(x.choice==='mabat'&&x.mabat)return x.mabat;if(x.choice==='usda'&&x.usda)return x.usda;return{name:x.aiName,u:'g',cal:n(x.aiPer100?.cal),p:n(x.aiPer100?.p),c:n(x.aiPer100?.c),f:n(x.aiPer100?.f),v:n(x.aiPer100?.v),w:0,src:x.fromLabel?'תווית היצרן':'Gemini'}}
 function comparisonUnit(x){return ['g','tsp','tbsp','cup','unit'].includes(x?.unit)?x.unit:'g'}
 function comparisonPortionFood(x){return selectedComparisonFood(x)||x?.mabat||x?.approved||null}
 function comparisonUnitWeight(x){let unit=comparisonUnit(x);return unit==='g'?1:(portionWeightForFood(comparisonPortionFood(x),unit)||unitGram[unit]||1)}
@@ -502,22 +504,24 @@ function comparisonGrams(x,useDraft=false){let amount=useDraft&&n(x?.draftAmount
 function comparisonAiActual(x){return foodActual(x.aiPer100||{},comparisonGrams(x))}
 function prepareAiComparison(items,photo=''){
  pendingAiPhoto=photo||'';
- pendingAiFoods=(items||[]).map((raw,i)=>{let fromLabel=!!raw.fromLabel,amount=n(raw.amount)||100,unit=['g','tsp','tbsp','cup','unit'].includes(raw.unit)?raw.unit:'g',aiName=raw.name||'מזון',approved=fromLabel?null:findApprovedFood(aiName),mabatMatches=fromLabel?[]:findMatches(aiName,50),mabat=mabatMatches[0]||null,reference=mabat||approved||findFood(aiName),grams=amount*(unit==='g'?1:(portionWeightForFood(reference,unit)||unitGram[unit]||1)),factor=grams>0?100/grams:1;return{id:i,aiName,amount,unit,aiPer100:{cal:n(raw.cal)*factor,p:n(raw.p)*factor,c:n(raw.c)*factor,f:n(raw.f)*factor,v:n(raw.v)*factor},approved,mabat,mabatMatches,choice:fromLabel?'gemini':(mabat?'mabat':(approved?'approved':'gemini')),fromLabel,labelBasis:raw.labelBasis||''}});
+ pendingAiFoods=(items||[]).map((raw,i)=>{let fromLabel=!!raw.fromLabel,amount=n(raw.amount)||100,unit=['g','tsp','tbsp','cup','unit'].includes(raw.unit)?raw.unit:'g',aiName=raw.name||'מזון',approved=fromLabel?null:findApprovedFood(aiName),mabatMatches=fromLabel?[]:findMatches(aiName,50),mabat=mabatMatches[0]||null,reference=mabat||approved||findFood(aiName),grams=amount*(unit==='g'?1:(portionWeightForFood(reference,unit)||unitGram[unit]||1)),factor=grams>0?100/grams:1;return{id:i,aiName,amount,unit,aiPer100:{cal:n(raw.cal)*factor,p:n(raw.p)*factor,c:n(raw.c)*factor,f:n(raw.f)*factor,v:n(raw.v)*factor},approved,mabat,mabatMatches,usda:null,usdaMatches:[],usdaQuery:'',usdaLoading:false,usdaError:'',usdaDemoKey:false,choice:fromLabel?'gemini':(mabat?'mabat':(approved?'approved':'gemini')),fromLabel,labelBasis:raw.labelBasis||''}});
  renderAiComparison();
  aiEditBox.scrollIntoView({behavior:'smooth',block:'center'});
 }
-function comparisonRow(label,ai,approved,mabat){return `<tr><td>${label}</td><td>${r(ai)}</td><td>${approved==null?'--':r(approved)}</td><td>${mabat==null?'--':r(mabat)}</td></tr>`}
+function comparisonRow(label,ai,approved,mabat,usda){return `<tr><td>${label}</td><td>${r(ai)}</td><td>${approved==null?'--':r(approved)}</td><td>${mabat==null?'--':r(mabat)}</td><td>${usda==null?'--':r(usda)}</td></tr>`}
 function renderAiComparison(){
  aiEditBox.classList.remove('hide');
  let photo=pendingAiPhoto?`<img class="compare-photo" src="${pendingAiPhoto}" alt="התמונה שנבדקה">`:'';
  aiEditBox.innerHTML=`<b>בדיקה ואישור</b><div class=small>${pendingAiFoods.some(x=>x.fromLabel)?'בדוק את הכמות. בתווית מוצר הערכים מועתקים מהאריזה בלבד, בלי MABAT.':'בדוק את הכמות ואת התאמת MABAT. כשנמצאה התאמה, ערכי MABAT נבחרים אוטומטית.'}</div>${photo}`+pendingAiFoods.map((x,i)=>{
-   let grams=comparisonGrams(x),ai=comparisonAiActual(x),a=x.approved?foodActual(x.approved,grams):null,m=x.mabat?foodActual(x.mabat,grams):null,chosen=selectedComparisonFood(x),actual=foodActual(chosen,grams);
-   let source=x.choice==='mabat'?'MABAT':(x.choice==='approved'?'ערך שאושר בעבר':(x.fromLabel?'תווית היצרן':'Gemini'));
-   let options=`<option value="gemini" ${x.choice==='gemini'?'selected':''}>Gemini</option>${x.approved?`<option value="approved" ${x.choice==='approved'?'selected':''}>ערך שאושר בעבר</option>`:''}${x.mabat?`<option value="mabat" ${x.choice==='mabat'?'selected':''}>MABAT</option>`:''}`;
+   let grams=comparisonGrams(x),ai=comparisonAiActual(x),a=x.approved?foodActual(x.approved,grams):null,m=x.mabat?foodActual(x.mabat,grams):null,u=x.usda?foodActual(x.usda,grams):null,chosen=selectedComparisonFood(x),actual=foodActual(chosen,grams);
+   let source=x.choice==='mabat'?'MABAT':(x.choice==='usda'?'USDA':(x.choice==='approved'?'ערך שאושר בעבר':(x.fromLabel?'תווית היצרן':'Gemini')));
+   let options=`<option value="gemini" ${x.choice==='gemini'?'selected':''}>Gemini</option>${x.approved?`<option value="approved" ${x.choice==='approved'?'selected':''}>ערך שאושר בעבר</option>`:''}${x.mabat?`<option value="mabat" ${x.choice==='mabat'?'selected':''}>MABAT</option>`:''}${x.usda?`<option value="usda" ${x.choice==='usda'?'selected':''}>USDA</option>`:''}`;
    let mabatOptions=(x.mabatMatches||[]).map((f,j)=>`<option value="${j}" ${f===x.mabat?'selected':''}>${f.name} | ${r(f.cal)} קל׳, חלבון ${r(f.p)}, פחמימה ${r(f.c)}, שומן ${r(f.f)} ל-100</option>`).join('');
    let mabatPicker=x.fromLabel?`<div class="notice ok"><b>מקור: תווית היצרן בלבד.</b> ${x.labelBasis?x.labelBasis+'. ':''}MABAT אינו בשימוש במסלול זה.</div>`:((x.mabatMatches||[]).length>1?`<label>בחר התאמת MABAT</label><select onchange="selectMabatMatch(${i},this.value)">${mabatOptions}</select>`:(x.mabat?`<div class="notice ok"><b>התאמת MABAT:</b> ${x.mabat.name}</div>`:'<div class="notice">לא נמצאה התאמה ב-MABAT. יישמר ערך Gemini.</div>'));
-   let comparison=x.fromLabel?`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">הערכים שנקראו מהאריזה</summary><table class=compare-table><tr><th>ערך לכמות</th><th>תווית היצרן</th></tr><tr><td>קלוריות</td><td>${r(ai.cal)}</td></tr><tr><td>חלבון</td><td>${r(ai.p)}</td></tr><tr><td>פחמימה</td><td>${r(ai.c)}</td></tr><tr><td>שומן</td><td>${r(ai.f)}</td></tr></table></details>`:`<details open class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">מידע נוסף והשוואת מקורות</summary><label>החלף מקור ידנית</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th></tr>${comparisonRow('קלוריות',ai.cal,a?.cal,m?.cal)}${comparisonRow('חלבון',ai.p,a?.p,m?.p)}${comparisonRow('פחמימה',ai.c,a?.c,m?.c)}${comparisonRow('שומן',ai.f,a?.f,m?.f)}</table></details>`;
-   return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${source}</span></div><div class="compare-quantity-row"><div><label for="pendingAmount${i}">כמות</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="decimal" enterkeyhint="done" type="text" autocomplete="off" onclick="this.focus();this.select()" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"></div><div><label for="pendingUnit${i}">יחידה</label><select id="pendingUnit${i}" onchange="changePendingUnit(${i},this.value)">${Object.entries(unitName).map(([u,label])=>`<option value="${u}" ${comparisonUnit(x)===u?'selected':''}>${label}</option>`).join('')}</select></div><div><label>המרה</label><div class="compare-conversion">≈ ${r(grams)} גרם/מ״ל</div></div></div>${mabatPicker}<div class="notice ok" style="margin-top:10px"><b>יישמרו:</b> ${r(actual.cal)} קל׳ | חלבון ${r(actual.p)} | פחמימה ${r(actual.c)} | שומן ${r(actual.f)}</div>${comparison}</div>`;
+   let usdaOptions=(x.usdaMatches||[]).map((f,j)=>`<option value="${j}" ${f===x.usda?'selected':''}>${escapeHtml(f.usdaName)} | ${r(f.cal)} קל׳, חלבון ${r(f.p)}, פחמימה ${r(f.c)}, שומן ${r(f.f)} ל-100</option>`).join('');
+   let usdaPicker=x.fromLabel?'':`<div style="margin-top:10px"><button type="button" style="background:#14532d" ${x.usdaLoading?'disabled':''} onclick="searchUsdaForFood(${i})">${x.usdaLoading?'מחפש ב-USDA...':'חפש גם ב-USDA'}</button>${x.usdaError?`<div class="notice err" style="margin-top:7px">${escapeHtml(x.usdaError)}</div>`:''}${(x.usdaMatches||[]).length?`<label>בחר התאמה מתוך USDA</label><select onchange="selectUsdaMatch(${i},this.value)">${usdaOptions}</select><div class="small">חיפוש באנגלית: ${escapeHtml(x.usdaQuery)}</div>${x.usdaDemoKey?'<div class="small" style="color:#9a6700">מצב בדיקה מוגבל של USDA. מומלץ להוסיף USDA_API_KEY פרטי.</div>':''}`:''}</div>`;
+   let comparison=x.fromLabel?`<details class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">הערכים שנקראו מהאריזה</summary><table class=compare-table><tr><th>ערך לכמות</th><th>תווית היצרן</th></tr><tr><td>קלוריות</td><td>${r(ai.cal)}</td></tr><tr><td>חלבון</td><td>${r(ai.p)}</td></tr><tr><td>פחמימה</td><td>${r(ai.c)}</td></tr><tr><td>שומן</td><td>${r(ai.f)}</td></tr></table></details>`:`<details open class="compare-details" style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--muted)">מידע נוסף והשוואת מקורות</summary><label>החלף מקור ידנית</label><select onchange="setComparisonChoice(${i},this.value)">${options}</select><div style="overflow-x:auto"><table class=compare-table><tr><th>ערך לכמות</th><th>Gemini</th><th>אושר בעבר</th><th>MABAT</th><th>USDA</th></tr>${comparisonRow('קלוריות',ai.cal,a?.cal,m?.cal,u?.cal)}${comparisonRow('חלבון',ai.p,a?.p,m?.p,u?.p)}${comparisonRow('פחמימה',ai.c,a?.c,m?.c,u?.c)}${comparisonRow('שומן',ai.f,a?.f,m?.f,u?.f)}</table></div></details>`;
+   return `<div class=compare-card><div class=compare-title><span>${x.aiName}</span><span class=compare-source>${source}</span></div><div class="compare-quantity-row"><div><label for="pendingAmount${i}">כמות</label><input id="pendingAmount${i}" value="${r(x.amount)}" inputmode="decimal" enterkeyhint="done" type="text" autocomplete="off" onclick="this.focus();this.select()" oninput="previewPendingAmount(${i},this.value)" onchange="commitPendingAmount(${i},this.value)"></div><div><label for="pendingUnit${i}">יחידה</label><select id="pendingUnit${i}" onchange="changePendingUnit(${i},this.value)">${Object.entries(unitName).map(([u,label])=>`<option value="${u}" ${comparisonUnit(x)===u?'selected':''}>${label}</option>`).join('')}</select></div><div><label>המרה</label><div class="compare-conversion">≈ ${r(grams)} גרם/מ״ל</div></div></div>${mabatPicker}${usdaPicker}<div class="notice ok" style="margin-top:10px"><b>יישמרו:</b> ${r(actual.cal)} קל׳ | חלבון ${r(actual.p)} | פחמימה ${r(actual.c)} | שומן ${r(actual.f)}</div>${comparison}</div>`;
  }).join('')+`<div class=compare-actions><div id="aiMealTargetPicker" hidden><b style="font-size:20px">לאן לשמור?</b><div class="ai-meal-target-choices">${['בוקר','צהריים','ערב','ביניים'].map(meal=>`<button type="button" class="${meal===st.currentMeal?'on':''}" onclick="setAiTargetMeal('${meal}')">${meal}</button>`).join('')}</div><div class="small" style="margin-top:9px">ברירת המחדל נקבעת לפי השעה. אפשר לשנות לפני השמירה.</div></div><button id="confirmAiFoodsButton" onclick="confirmAiFoods()">אשר והוסף ל-${st.currentMeal}</button><button id="changeAiMealButton" type="button" aria-controls="aiMealTargetPicker" aria-expanded="false" style="background:#eef3fb;color:#243b7a;border:2px solid #c9d8ee" onclick="toggleAiMealTargetPicker()">שנה ארוחה</button><button style="background:#6b7280" onclick="clearAiReview()">בטל</button></div>`;
 }
 function updateAiAmount(i,val){let x=pendingAiFoods[i],nu=n(val);if(!x||nu<=0)return;x.amount=nu;delete x.draftAmount;renderAiComparison()}
@@ -528,7 +532,26 @@ function adjustPendingAmount(i,delta){let x=pendingAiFoods[i],current=x.draftAmo
 function changePendingUnit(i,unit){let x=pendingAiFoods[i];if(!x)return;if(n(x.draftAmount)>0)x.amount=n(x.draftAmount);delete x.draftAmount;x.unit=['g','tsp','tbsp','cup','unit'].includes(unit)?unit:'g';renderAiComparison()}
 function setComparisonChoice(i,choice){pendingAiFoods[i].choice=choice;renderAiComparison()}
 function selectMabatMatch(i,index){let x=pendingAiFoods[i],f=(x.mabatMatches||[])[Number(index)];if(!f)return;x.mabat=f;x.choice='mabat';renderAiComparison()}
-function rememberApprovedFood(food,photo){st.approvedFoods=st.approvedFoods||[];let approved={...food,a:[food.name],src:'אושר על ידי המשתמש',approvedAt:new Date().toISOString(),photo:photo||''};let idx=st.approvedFoods.findIndex(x=>clean(x.name)===clean(food.name));if(idx>=0)st.approvedFoods[idx]=approved;else st.approvedFoods.unshift(approved)}
+function selectUsdaMatch(i,index){let x=pendingAiFoods[i],f=(x.usdaMatches||[])[Number(index)];if(!f)return;x.usda=f;x.choice='usda';renderAiComparison()}
+async function searchUsdaForFood(i){
+ let x=pendingAiFoods[i];if(!x||x.fromLabel||x.usdaLoading)return;
+ x.usdaLoading=true;x.usdaError='';renderAiComparison();
+ try{
+  let translated=await callAiBackend(`תרגם לאנגלית את שם המזון הבא לצורך חיפוש במאגר USDA. שמור במדויק את שיטת ההכנה, למשל אפוי, מבושל, מטוגן, עם שמן או ללא שמן. החזר רק ביטוי חיפוש באנגלית בלי הסבר ובלי סימני ציטוט: ${x.aiName}`,null,'auto');
+  translated=String(translated||'').split(/\n/)[0].replace(/^["'`]+|["'`]+$/g,'').trim().slice(0,160);
+  if(!translated)throw new Error('לא התקבל תרגום לחיפוש.');
+  let response=await fetch('/api/usda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:translated})});
+  let data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||('USDA HTTP '+response.status));
+  x.usdaQuery=translated;
+  x.usdaDemoKey=!!data.demoKey;
+  x.usdaMatches=(data.foods||[]).map(food=>({name:x.aiName,usdaName:food.description,a:[x.aiName,translated,food.description],u:'g',cal:n(food.cal),p:n(food.p),c:n(food.c),f:n(food.f),v:0,w:0,fiber:n(food.fiber),src:'USDA FoodData Central',fdcId:food.fdcId,dataType:food.dataType}));
+  x.usda=x.usdaMatches[0]||null;
+  if(x.usda)x.choice='usda';else x.usdaError='לא נמצאה התאמה אמינה ב-USDA.';
+ }catch(error){x.usdaError=error.message||'החיפוש ב-USDA נכשל.'}
+ finally{x.usdaLoading=false;renderAiComparison()}
+}
+function rememberApprovedFood(food,photo){st.approvedFoods=st.approvedFoods||[];let approved={...food,a:[...new Set([food.name,...(food.a||[])])],src:food.src==='USDA FoodData Central'?'USDA FoodData Central - אושר על ידי המשתמש':'אושר על ידי המשתמש',approvedAt:new Date().toISOString(),photo:photo||''};let idx=st.approvedFoods.findIndex(x=>clean(x.name)===clean(food.name));if(idx>=0)st.approvedFoods[idx]=approved;else st.approvedFoods.unshift(approved)}
 async function confirmAiFoods(){if(confirmAiFoods.saving||!pendingAiFoods.length)return;confirmAiFoods.saving=true;let button=document.querySelector('#aiEditBox .compare-actions button');if(button){button.disabled=true;button.textContent='שומר...'}let count=pendingAiFoods.length,meal=st.currentMeal;try{pendingAiFoods.forEach(x=>{if(n(x.draftAmount)>0)x.amount=n(x.draftAmount);delete x.draftAmount;let food=selectedComparisonFood(x),grams=comparisonGrams(x);addEntry(food,grams,{amount:x.amount,unit:comparisonUnit(x)});rememberApprovedFood(food,pendingAiPhoto)});save();if(typeof window.forceCloudSave==='function')await window.forceCloudSave();clearAiReview();render();msg(`${count} פריטים אושרו, הכמות נשמרה ונוספו ל-${meal}.`,'ok')}catch(e){save();render();msg('הפריט נשמר במכשיר, אך הסנכרון לענן נכשל. נסה שוב בעוד רגע.','err');console.error('meal confirmation cloud save failed',e)}finally{confirmAiFoods.saving=false}}
 function clearAiReview(){pendingAiFoods=[];pendingAiPhoto='';quick.value='';aiEditBox.innerHTML='';aiEditBox.classList.add('hide');msg('',0);sbox.classList.add('hide')}
 async function analyzeQuickWithGemini(){let text=(quick.value||'').trim();if(!text){msg('כתוב או אמור מה אכלת','err');return}let btn=document.getElementById('quickAnalyzeBtn');btn.classList.add('loading-btn');btn.textContent='Gemini בודק...';msg('Gemini מזהה את המאכל והכמות...','ok');try{prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}finally{btn.classList.remove('loading-btn');btn.textContent='בדוק עם Gemini'}}
@@ -751,8 +774,48 @@ function renderMealJournal(){
 function mealSums(){let meals=['בוקר','צהריים','ערב','ביניים'];let out={};meals.forEach(m=>out[m]={cal:0,p:0,c:0,f:0,v:0,count:0});(st.entries||[]).forEach(e=>{let m=e.meal||'ביניים';if(!out[m])out[m]={cal:0,p:0,c:0,f:0,v:0,count:0};out[m].cal+=n(e.cal);out[m].p+=n(e.p);out[m].c+=n(e.c);out[m].f+=n(e.f);out[m].v+=n(e.v);out[m].count++});return out}
 function runMealAnalysis(){let t=totals(),g=st.targets,ms=mealSums();let left={cal:g.calories-t.cal,p:g.protein-t.p,c:g.carbs-t.c,f:g.fat-t.f,v:g.veg-t.v};let rows=Object.keys(ms).map(m=>`<tr><td>${m}</td><td>${r(ms[m].cal)}</td><td>${r(ms[m].p)}</td><td>${r(ms[m].c)}</td><td>${r(ms[m].f)}</td><td>${r(ms[m].v)}</td></tr>`).join('');let tips=[];if(left.p>25)tips.push('חסר חלבון משמעותי: בארוחה הבאה לשלב חלבון רזה כמו טונה, ביצים, יוגורט/קוטג׳ או עוף.');else if(left.p>10)tips.push('חסר מעט חלבון: להוסיף מקור חלבון קטן בארוחה הבאה.');if(left.v>200)tips.push('חסר ירקות: להוסיף סלט/ירקות חתוכים כדי לסגור סיבים ונפח.');if(left.cal<0)tips.push('יש חריגה בקלוריות: בארוחה הבאה לבחור חלבון + ירקות ולהוריד שמן/פחמימה.');if(left.c<0)tips.push('הפחמימה כבר גבוהה: עדיף לאזן עם חלבון וירקות ללא תוספת לחם/אורז.');if(left.f<0)tips.push('השומן גבוה: להיזהר משמן, טחינה, גבינות שמנות ואגוזים בארוחה הבאה.');if(!tips.length)tips.push('היום מאוזן יחסית. בארוחה הבאה לשמור על חלוקה דומה.');mealAnalysis.innerHTML=`<div class="analysis-card"><b>טבלת ארוחות</b><table class="meal-table"><tr><th>ארוחה</th><th>קל׳</th><th>חלבון</th><th>פחמימה</th><th>שומן</th><th>ירק</th></tr>${rows}</table></div><div class="analysis-card"><b>מה נשאר להיום</b><br><span class="pill">קלוריות ${r(left.cal)}</span><span class="pill">חלבון ${r(left.p)} ג׳</span><span class="pill">פחמימה ${r(left.c)} ג׳</span><span class="pill">שומן ${r(left.f)} ג׳</span><span class="pill">ירקות ${r(left.v)} ג׳</span></div><div class="analysis-card"><b>המלצה לאיזון</b><br>${tips.join('<br>')}</div>`;archiveCurrentDay();renderHistoryAnalysis()}
 function setRange(rng,el){analysisRange=rng;document.querySelectorAll('#pAnalysis .mode-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderHistoryAnalysis()}
-function daysBack(rng){return rng==='year'?365:(rng==='quarter'?92:31)}
-function renderHistoryAnalysis(){if(!document.getElementById('historyAnalysis'))return;if(!st.history)st.history={};archiveCurrentDay();let now=new Date();let min=new Date(now);min.setDate(min.getDate()-daysBack(analysisRange));let days=Object.values(st.history).filter(d=>new Date(d.date)>=min);if(!days.length){historyAnalysis.textContent='אין עדיין מספיק נתונים.';return}let sum={cal:0,p:0,c:0,f:0,v:0,water:0,steps:0};days.forEach(d=>{(d.entries||[]).forEach(e=>{sum.cal+=n(e.cal);sum.p+=n(e.p);sum.c+=n(e.c);sum.f+=n(e.f);sum.v+=n(e.v)});sum.water+=n(d.water);sum.steps+=n(d.steps)});let count=days.length;historyAnalysis.innerHTML=`ימים עם נתונים: ${count}<br>ממוצע קלוריות: ${r(sum.cal/count)}<br>ממוצע חלבון: ${r(sum.p/count)} גרם<br>ממוצע פחמימה: ${r(sum.c/count)} גרם<br>ממוצע שומן: ${r(sum.f/count)} גרם<br>ממוצע ירקות: ${r(sum.v/count)} גרם<br>ממוצע מים: ${r(sum.water/count)} מ״ל<br>ממוצע צעדים: ${Math.round(sum.steps/count)}`}
+function daysBack(rng){return rng==='year'?365:(rng==='quarter'?92:(rng==='month'?31:6))}
+function historyDayTracked(day){return !!((day?.entries||[]).length||n(day?.water)>0||n(day?.steps)>0||(day?.workouts||[]).length)}
+function setHistoryDayIncluded(dateKey,included){
+ if(!st.analysisExcludedDates)st.analysisExcludedDates={};
+ if(included)delete st.analysisExcludedDates[dateKey];else st.analysisExcludedDates[dateKey]=true;
+ save();renderHistoryAnalysis();
+}
+function historyDateLabel(dateKey){
+ let d=new Date(dateKey+'T12:00:00');
+ return new Intl.DateTimeFormat('he-IL',{weekday:'short',day:'numeric',month:'numeric'}).format(d)
+}
+function renderHistoryAnalysis(){
+ if(!document.getElementById('historyAnalysis'))return;
+ if(!st.history)st.history={};
+ if(!st.analysisExcludedDates)st.analysisExcludedDates={};
+ archiveCurrentDay();
+ let now=new Date(),min=new Date(now);min.setHours(0,0,0,0);min.setDate(min.getDate()-daysBack(analysisRange));
+ let recorded=Object.values(st.history).filter(d=>new Date(d.date+'T12:00:00')>=min).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ let displayDays=recorded;
+ if(analysisRange==='week'){
+  displayDays=[];
+  for(let offset=0;offset<7;offset++){
+   let d=new Date(now);d.setHours(12,0,0,0);d.setDate(d.getDate()-offset);
+   let key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+   displayDays.push(st.history[key]||{date:key,entries:[],water:0,steps:0,workouts:[]});
+  }
+ }
+ let trackedDays=displayDays.filter(historyDayTracked);
+ let days=trackedDays.filter(d=>!st.analysisExcludedDates[d.date]);
+ let selector='';
+ if(analysisRange==='week'){
+  selector=`<div class="analysis-card"><b>בחר ימים שנכנסים לממוצע</b><div class="small">ימים ללא מעקב אינם נספרים. אפשר לבטל יום עם מעקב חלקי.</div>${displayDays.map(d=>{
+   let tracked=historyDayTracked(d),included=tracked&&!st.analysisExcludedDates[d.date];
+   return `<label style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--b);font-weight:700"><input type="checkbox" style="width:auto;margin:0" ${included?'checked':''} ${tracked?'':'disabled'} onchange="setHistoryDayIncluded('${d.date}',this.checked)"><span>${historyDateLabel(d.date)}</span><span class="small" style="margin-right:auto">${tracked?'יש מעקב':'אין מעקב'}</span></label>`
+  }).join('')}</div>`;
+ }
+ if(!days.length){historyAnalysis.innerHTML=selector+'<div class="analysis-card">אין ימים שנבחרו לחישוב.</div>';return}
+ let sum={cal:0,p:0,c:0,f:0,v:0,water:0,steps:0};
+ days.forEach(d=>{(d.entries||[]).forEach(e=>{sum.cal+=n(e.cal);sum.p+=n(e.p);sum.c+=n(e.c);sum.f+=n(e.f);sum.v+=n(e.v)});sum.water+=n(d.water);sum.steps+=n(d.steps)});
+ let count=days.length;
+ historyAnalysis.innerHTML=selector+`<div class="analysis-card"><b>ממוצע לפי ${count} ימים שנבחרו</b><br>ממוצע קלוריות: ${r(sum.cal/count)}<br>ממוצע חלבון: ${r(sum.p/count)} גרם<br>ממוצע פחמימה: ${r(sum.c/count)} גרם<br>ממוצע שומן: ${r(sum.f/count)} גרם<br>ממוצע ירקות: ${r(sum.v/count)} גרם<br>ממוצע מים: ${r(sum.water/count)} מ״ל<br>ממוצע צעדים: ${Math.round(sum.steps/count)}</div>`
+}
 
 async function voice(){
  let SR=window.SpeechRecognition||window.webkitSpeechRecognition;
