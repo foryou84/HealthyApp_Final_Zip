@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v46-usda-fallback';
+const CACHE_NAME='healthy-app-v47-weekly-day-details';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
