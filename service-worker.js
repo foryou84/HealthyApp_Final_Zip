@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v47-weekly-day-details';
+const CACHE_NAME='healthy-app-v48-monthly-export';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{

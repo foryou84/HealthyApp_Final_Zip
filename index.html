@@ -59,6 +59,11 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .weekly-meal-actions button{width:auto;margin:0;padding:7px 9px;font-size:12px}
 .weekly-entry{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;padding:10px;border-top:1px solid var(--b)}
 .weekly-entry:first-of-type{border-top:0}
+.month-toolbar{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:10px 0}
+.month-toolbar button{width:auto;margin:0;padding:9px 12px}
+.month-toolbar strong{text-align:center;font-size:18px}
+.month-export-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.month-export-actions button{margin:0}
 .entry{border-top:1px solid var(--b);padding:12px 0;display:grid;grid-template-columns:1fr auto;gap:10px}.entry:first-child{border-top:0}.del{background:#fee2e2;color:#b91c1c;width:auto;margin:0;padding:8px 10px}
 .meal-group{border:1px solid var(--b);border-radius:18px;margin:10px 0;background:#fbfdff;overflow:hidden}
 .meal-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px;cursor:pointer}
@@ -346,6 +351,7 @@ let st=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(base);
 let manualMode='serving';
 let analysisRange='week';
 let openHistoryDayDate='';
+let analysisMonthKey=localDateKey().slice(0,7);
 
 const MABAT_EMBEDDED=[].concat(window.MABAT_CHUNK_1,window.MABAT_CHUNK_2,window.MABAT_CHUNK_3,window.MABAT_CHUNK_4,window.MABAT_CHUNK_5,window.MABAT_CHUNK_6,window.MABAT_CHUNK_7,window.MABAT_CHUNK_8);
 const foods=[
@@ -802,6 +808,55 @@ function historyDateLabel(dateKey){
  let d=new Date(dateKey+'T12:00:00');
  return new Intl.DateTimeFormat('he-IL',{weekday:'short',day:'numeric',month:'numeric'}).format(d)
 }
+function currentMonthKey(){return localDateKey().slice(0,7)}
+function analysisMonthLabel(monthKey){
+ let [year,month]=monthKey.split('-').map(Number),d=new Date(year,month-1,1,12);
+ return new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric'}).format(d)
+}
+function shiftAnalysisMonth(delta){
+ let [year,month]=analysisMonthKey.split('-').map(Number),d=new Date(year,month-1+delta,1,12),next=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+ if(next>currentMonthKey())return;
+ analysisMonthKey=next;openHistoryDayDate='';renderHistoryAnalysis()
+}
+function monthCalendarDays(monthKey){
+ let [year,month]=monthKey.split('-').map(Number),lastDay=new Date(year,month,0).getDate(),today=localDateKey(),out=[];
+ for(let day=lastDay;day>=1;day--){
+  let key=`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  if(monthKey===currentMonthKey()&&key>today)continue;
+  out.push(st.history[key]||{date:key,entries:[],water:0,steps:0,workouts:[]})
+ }
+ return out
+}
+function csvCell(value){
+ let text=String(value??'');
+ if(/^[=+\-@]/.test(text))text="'"+text;
+ return '"'+text.replace(/"/g,'""')+'"'
+}
+function monthlyReportCsv(monthKey){
+ archiveCurrentDay();
+ let days=monthCalendarDays(monthKey),rows=[['סוג שורה','תאריך','יום','נכלל בניתוח','ארוחה','מאכל','כמות','יחידה','קלוריות','חלבון','פחמימה','שומן','ירקות','מים','צעדים']];
+ days.filter(historyDayTracked).slice().reverse().forEach(day=>{
+  let included=!st.analysisExcludedDates?.[day.date],tot=historyDayTotals(day),weekday=new Intl.DateTimeFormat('he-IL',{weekday:'long'}).format(new Date(day.date+'T12:00:00'));
+  rows.push(['סיכום יום',day.date,weekday,included?'כן':'לא','','','', '',r(tot.cal),r(tot.p),r(tot.c),r(tot.f),r(tot.v),r(day.water),Math.round(n(day.steps))]);
+  (day.entries||[]).slice().reverse().forEach(e=>rows.push(['מאכל',day.date,weekday,included?'כן':'לא',e.meal||'ביניים',e.name,r(e.amount),e.unit||'גרם',r(e.cal),r(e.p),r(e.c),r(e.f),r(e.v),'','']))
+ });
+ return '\ufeff'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')
+}
+function monthlyReportFile(monthKey){
+ return new File([monthlyReportCsv(monthKey)],`healthy-app-${monthKey}.csv`,{type:'text/csv;charset=utf-8'})
+}
+function downloadMonthlyExcel(){
+ let file=monthlyReportFile(analysisMonthKey),url=URL.createObjectURL(file),link=document.createElement('a');
+ link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
+}
+async function shareMonthlyReport(){
+ let file=monthlyReportFile(analysisMonthKey),title='דוח תזונה - '+analysisMonthLabel(analysisMonthKey);
+ try{
+  if(navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title,text:'דוח חודשי מאפליקציית אורח חיים בריא',files:[file]});return}
+  downloadMonthlyExcel();
+  location.href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent('קובץ הדוח הורד למכשיר. ניתן לצרף אותו למייל בשם '+file.name);
+ }catch(error){if(error?.name!=='AbortError')alert('השיתוף לא הצליח. אפשר להוריד את קובץ האקסל ולצרף אותו ידנית למייל.')}
+}
 function historyDayTotals(day){
  return (day?.entries||[]).reduce((a,e)=>(a.cal+=n(e.cal),a.p+=n(e.p),a.c+=n(e.c),a.f+=n(e.f),a.v+=n(e.v),a),{cal:0,p:0,c:0,f:0,v:0})
 }
@@ -875,12 +930,17 @@ function renderHistoryAnalysis(){
    let key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
    displayDays.push(st.history[key]||{date:key,entries:[],water:0,steps:0,workouts:[]});
   }
+ }else if(analysisRange==='month'){
+  displayDays=monthCalendarDays(analysisMonthKey);
  }
  let trackedDays=displayDays.filter(historyDayTracked);
  let days=trackedDays.filter(d=>!st.analysisExcludedDates[d.date]);
  let selector='';
  if(analysisRange==='week'){
   selector=`<div class="analysis-card"><b>ניתוח שבועי לפי יום</b><div class="small">לחץ על יום כדי לראות מה אכלת. כבה יום חלקי כדי שלא ייכנס לממוצע, או מחק אותו לחלוטין.</div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
+ }else if(analysisRange==='month'){
+  let atCurrent=analysisMonthKey===currentMonthKey();
+  selector=`<div class="analysis-card"><b>מעקב חודשי לפי יום</b><div class="month-toolbar"><button type="button" onclick="shiftAnalysisMonth(-1)">הקודם</button><strong>${analysisMonthLabel(analysisMonthKey)}</strong><button type="button" ${atCurrent?'disabled style="opacity:.4"':''} onclick="shiftAnalysisMonth(1)">הבא</button></div><div class="small">לחץ על יום להצגת הארוחות. יום שכיבית נשמר, אך אינו נכנס לממוצע החודשי.</div><div class="month-export-actions"><button type="button" onclick="downloadMonthlyExcel()">ייצא לאקסל</button><button type="button" style="background:#6b7280" onclick="shareMonthlyReport()">שלח במייל</button></div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
  }
  if(!days.length){historyAnalysis.innerHTML=selector+'<div class="analysis-card">אין ימים שנבחרו לחישוב.</div>';return}
  let sum={cal:0,p:0,c:0,f:0,v:0,water:0,steps:0};
