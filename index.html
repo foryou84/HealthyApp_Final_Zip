@@ -383,6 +383,7 @@ const base={profile:{age:0,weight:0,height:0,goalWeight:0,gender:'male',activity
 function safeStoredState(key){try{let value=JSON.parse(localStorage.getItem(key)||'null');return value&&typeof value==='object'?value:null}catch{return null}}
 function freshState(){return structuredClone(base)}
 function userStorageKey(uid){return 'healthy_life_user_v2_'+uid}
+function storedStateOrFresh(key){return safeStoredState(key)||freshState()}
 let activeStorageKey=GUEST_KEY;
 let st=safeStoredState(GUEST_KEY)||freshState();
 let readOnlyMode=false;
@@ -1160,7 +1161,13 @@ window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clear
 onAuthStateChanged(auth,async u=>{
  clearTimeout(window.__saveT);authGeneration++;fbUser=u;
  if(sharedViewId){fbUser=null;await loadSharedView(sharedViewId);return}
- if(!u){pendingRegistration=false;switchStoredState(GUEST_KEY,freshState());authMsg('לא מחובר. הנתונים האישיים מוסתרים עד להתחברות.',false);show('Profile');render();return}
+ if(!u){
+  pendingRegistration=false;
+  // Never replace saved guest meals with an empty state on reload, deploy or sign-out.
+  // The previous behavior persisted freshState() over GUEST_KEY and could erase the day's meals.
+  switchStoredState(GUEST_KEY,storedStateOrFresh(GUEST_KEY),false);
+  authMsg('לא מחובר. הנתונים נשמרים במכשיר זה בלבד עד להתחברות.',false);show('Profile');render();return
+ }
  let generation=authGeneration,key=userStorageKey(u.uid),cached=safeStoredState(key),isNew=pendingRegistration;pendingRegistration=false;
  authMsg('טוען את הנתונים של '+u.email+'...',true);
  try{

@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v54-dietitian-plan';
+const CACHE_NAME='healthy-app-v55-preserve-guest-meals';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
