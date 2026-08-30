@@ -64,6 +64,14 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .month-toolbar strong{text-align:center;font-size:18px}
 .month-export-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
 .month-export-actions button{margin:0}
+.dietitian-panel{border:2px solid #bbf7d0;background:#f0fdf4}
+.dietitian-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.dietitian-actions button{margin:0}
+.dietitian-plan-summary{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
+.dietitian-recommendation{background:#fff;border:1px solid #bbf7d0;border-radius:16px;padding:12px;margin:10px 0}
+.dietitian-recommendation h4{margin:0 0 6px;font-size:17px}
+.dietitian-recommendation select,.dietitian-recommendation textarea{margin-top:7px}
+.dietitian-meta{color:#4b5563;font-size:13px;line-height:1.5}
 .read-only-banner{position:sticky;top:0;z-index:20;background:#fff7ed;color:#9a3412;border:2px solid #fdba74;border-radius:16px;padding:11px;margin:8px 0;font-weight:900;text-align:center}
 .share-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .share-actions button{margin:0}
@@ -371,7 +379,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 function localDateKey(){let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 const LEGACY_KEY='healthy_life_fixed_dual_calc_v1';
 const GUEST_KEY='healthy_life_guest_v2';
-const base={profile:{age:0,weight:0,height:0,goalWeight:0,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
+const base={profile:{age:0,weight:0,height:0,goalWeight:0,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[],dietitianPlans:{}};
 function safeStoredState(key){try{let value=JSON.parse(localStorage.getItem(key)||'null');return value&&typeof value==='object'?value:null}catch{return null}}
 function freshState(){return structuredClone(base)}
 function userStorageKey(uid){return 'healthy_life_user_v2_'+uid}
@@ -912,6 +920,16 @@ function monthlyReportCsv(monthKey){
 function monthlyReportFile(monthKey){
  return new File([monthlyReportCsv(monthKey)],`healthy-app-${monthKey}.csv`,{type:'text/csv;charset=utf-8'})
 }
+function dietitianTemplateCsv(monthKey){
+ let rows=[
+  ['חודש','שינוי מומלץ','פירוט או הנחיה','יעד או כמות','עדיפות'],
+  [monthKey,'לדוגמה: להוסיף ארוחת בוקר','מה לאכול ובאילו ימים','5 ימים בשבוע','גבוהה']
+ ];
+ return '\ufeff'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')
+}
+function dietitianTemplateFile(monthKey){
+ return new File([dietitianTemplateCsv(monthKey)],`dietitian-plan-template-${monthKey}.csv`,{type:'text/csv;charset=utf-8'})
+}
 function downloadMonthlyExcel(){
  let file=monthlyReportFile(analysisMonthKey),url=URL.createObjectURL(file),link=document.createElement('a');
  link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
@@ -923,6 +941,76 @@ async function shareMonthlyReport(){
   downloadMonthlyExcel();
   location.href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent('קובץ הדוח הורד למכשיר. ניתן לצרף אותו למייל בשם '+file.name);
  }catch(error){if(error?.name!=='AbortError')alert('השיתוף לא הצליח. אפשר להוריד את קובץ האקסל ולצרף אותו ידנית למייל.')}
+}
+async function sendForDietitianConsultation(){
+ let report=monthlyReportFile(analysisMonthKey),template=dietitianTemplateFile(analysisMonthKey),title='ייעוץ דיאטנית - '+analysisMonthLabel(analysisMonthKey);
+ try{
+  if(navigator.share&&navigator.canShare?.({files:[report,template]})){
+   await navigator.share({title,text:'מצורפים דוח התזונה החודשי ותבנית להחזרת המלצות. יש למלא כל שינוי בשורה נפרדת.',files:[report,template]});return
+  }
+  [report,template].forEach(file=>{let url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)});
+  location.href='mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent('הורדו למכשיר דוח חודשי ותבנית המלצות. יש לצרף את שני הקבצים למייל ולבקש מהדיאטנית לרשום כל שינוי בשורה נפרדת.');
+ }catch(error){if(error?.name!=='AbortError')alert('השיתוף לא הצליח. אפשר להוריד את הדוח והתבנית ולצרף אותם ידנית למייל.')}
+}
+function parseCsvRows(text){
+ let rows=[],row=[],cell='',quoted=false,input=String(text||'').replace(/^\ufeff/,'');
+ for(let i=0;i<input.length;i++){
+  let ch=input[i];
+  if(quoted){if(ch==='"'&&input[i+1]==='"'){cell+='"';i++}else if(ch==='"')quoted=false;else cell+=ch;continue}
+  if(ch==='"'){quoted=true;continue}
+  if(ch===','){row.push(cell.trim());cell='';continue}
+  if(ch==='\n'){row.push(cell.trim());if(row.some(Boolean))rows.push(row);row=[];cell='';continue}
+  if(ch!=='\r')cell+=ch
+ }
+ row.push(cell.trim());if(row.some(Boolean))rows.push(row);return rows
+}
+function normalizePlanHeader(value){return String(value||'').trim().toLowerCase().replace(/["'׳״]/g,'').replace(/\s+/g,' ')}
+function recommendationRowsFromGrid(grid){
+ let rows=(grid||[]).map(row=>(row||[]).map(value=>String(value??'').trim())).filter(row=>row.some(Boolean));if(!rows.length)return [];
+ let headerIndex=rows.findIndex(row=>row.some(cell=>/שינוי|המלצה|recommend|action/.test(normalizePlanHeader(cell))));
+ let headers=headerIndex>=0?rows[headerIndex].map(normalizePlanHeader):[],data=rows.slice(headerIndex>=0?headerIndex+1:0);
+ let findColumn=patterns=>headers.findIndex(header=>patterns.some(pattern=>header.includes(pattern)));
+ let changeCol=findColumn(['שינוי מומלץ','מה לשנות','המלצה','שינוי','recommendation','recommended change','action']);
+ let detailsCol=findColumn(['פירוט','הנחיה','הסבר','details','instruction']);
+ let targetCol=findColumn(['יעד','כמות','target','amount']);
+ let priorityCol=findColumn(['עדיפות','priority']);
+ return data.map((row,index)=>{
+  let change=(changeCol>=0?row[changeCol]:row[0])||'',fallbackDetails=(changeCol>=0?row.filter((_,i)=>i!==changeCol&&i!==targetCol&&i!==priorityCol):row.slice(1)).join(' | '),details=(detailsCol>=0?row[detailsCol]:fallbackDetails)||'';
+  return {id:`${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`,change,details,target:targetCol>=0?(row[targetCol]||''):'',priority:priorityCol>=0?(row[priorityCol]||''):'',feasibility:'pending',userNote:''}
+ }).filter(item=>item.change).slice(0,100)
+}
+function loadSheetJs(){
+ if(window.XLSX)return Promise.resolve(window.XLSX);
+ return new Promise((resolve,reject)=>{let existing=document.getElementById('sheetJsLoader');if(existing){existing.addEventListener('load',()=>resolve(window.XLSX),{once:true});existing.addEventListener('error',()=>reject(new Error('טעינת קורא Excel נכשלה')),{once:true});return}let script=document.createElement('script');script.id='sheetJsLoader';script.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('קורא Excel לא נטען'));script.onerror=()=>reject(new Error('טעינת קורא Excel נכשלה'));document.head.appendChild(script)})
+}
+async function readDietitianWorkbook(file){
+ if(/\.csv$/i.test(file.name)||/text\/csv/i.test(file.type))return recommendationRowsFromGrid(parseCsvRows(await file.text()));
+ let XLSX=await loadSheetJs(),book=XLSX.read(await file.arrayBuffer(),{type:'array'}),best=[];
+ for(let name of book.SheetNames){let rows=recommendationRowsFromGrid(XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,defval:'',raw:false}));if(rows.length>best.length)best=rows}
+ return best
+}
+async function importDietitianPlan(event){
+ let file=event.target.files?.[0];event.target.value='';if(!file)return;
+ try{
+  let recommendations=await readDietitianWorkbook(file);if(!recommendations.length)throw new Error('לא נמצאו שורות המלצה. השתמש בכותרת „שינוי מומלץ” או „המלצה”.');
+  st.dietitianPlans=st.dietitianPlans||{};let previous=st.dietitianPlans[analysisMonthKey]?.recommendations||[];
+  recommendations.forEach(item=>{let old=previous.find(x=>normalizePlanHeader(x.change)===normalizePlanHeader(item.change)&&normalizePlanHeader(x.details)===normalizePlanHeader(item.details));if(old){item.feasibility=old.feasibility||'pending';item.userNote=old.userNote||''}});
+  st.dietitianPlans[analysisMonthKey]={fileName:file.name,importedAt:new Date().toISOString(),recommendations};save();renderHistoryAnalysis();alert(`נקלטו ${recommendations.length} המלצות לתוכנית של ${analysisMonthLabel(analysisMonthKey)}.`)
+ }catch(error){alert('ייבוא תוכנית הדיאטנית נכשל: '+error.message)}
+}
+function updateDietitianRecommendation(monthKey,id,field,value){
+ let plan=st.dietitianPlans?.[monthKey],item=plan?.recommendations?.find(x=>String(x.id)===String(id));if(!item||!['feasibility','userNote'].includes(field))return;item[field]=String(value||'');save();renderDietitianPlanSummary(monthKey)
+}
+function renderDietitianPlanSummary(monthKey){
+ let box=document.getElementById('dietitianPlanSummary'),plan=st.dietitianPlans?.[monthKey];if(!box)return;
+ if(!plan?.recommendations?.length){box.innerHTML='<div class="small">עדיין לא הועלתה תוכנית דיאטנית לחודש זה.</div>';return}
+ let counts={pending:0,yes:0,partial:0,no:0};plan.recommendations.forEach(item=>counts[item.feasibility||'pending']=(counts[item.feasibility||'pending']||0)+1);
+ box.innerHTML=`<div class="dietitian-plan-summary"><span class="pill">${plan.recommendations.length} שינויים</span><span class="pill">אפשרי ${counts.yes}</span><span class="pill">חלקית ${counts.partial}</span><span class="pill">לא אפשרי ${counts.no}</span><span class="pill">טרם נבדק ${counts.pending}</span></div>`
+}
+function renderDietitianPlan(monthKey){
+ let plan=st.dietitianPlans?.[monthKey];if(!plan?.recommendations?.length)return '<div id="dietitianPlanSummary"><div class="small">עדיין לא הועלתה תוכנית דיאטנית לחודש זה.</div></div>';
+ let esc=escapeHtml,imported=plan.importedAt?new Intl.DateTimeFormat('he-IL',{dateStyle:'short',timeStyle:'short'}).format(new Date(plan.importedAt)):'';
+ return `<div class="small">קובץ: ${esc(plan.fileName||'')} ${imported?'| נקלט '+esc(imported):''}</div><div id="dietitianPlanSummary"></div>${plan.recommendations.map((item,index)=>`<div class="dietitian-recommendation"><h4>${index+1}. ${esc(item.change)}</h4>${item.details?`<div class="dietitian-meta">${esc(item.details)}</div>`:''}<div class="dietitian-meta">${item.target?'יעד: '+esc(item.target):''}${item.target&&item.priority?' | ':''}${item.priority?'עדיפות: '+esc(item.priority):''}</div><label>האם השינוי ניתן לביצוע?</label><select onchange="updateDietitianRecommendation('${monthKey}','${esc(item.id)}','feasibility',this.value)"><option value="pending" ${item.feasibility==='pending'?'selected':''}>טרם החלטתי</option><option value="yes" ${item.feasibility==='yes'?'selected':''}>אפשרי לביצוע</option><option value="partial" ${item.feasibility==='partial'?'selected':''}>אפשרי חלקית</option><option value="no" ${item.feasibility==='no'?'selected':''}>לא אפשרי כרגע</option></select><label>מה אוכל לבצע או מה מפריע?</label><textarea rows="2" placeholder="לדוגמה: אפשר 3 פעמים בשבוע" oninput="updateDietitianRecommendation('${monthKey}','${esc(item.id)}','userNote',this.value)">${esc(item.userNote||'')}</textarea></div>`).join('')}`
 }
 function historyDayTotals(day){
  return (day?.entries||[]).reduce((a,e)=>(a.cal+=n(e.cal),a.p+=n(e.p),a.c+=n(e.c),a.f+=n(e.f),a.v+=n(e.v),a),{cal:0,p:0,c:0,f:0,v:0})
@@ -1007,13 +1095,13 @@ function renderHistoryAnalysis(){
   selector=`<div class="analysis-card"><b>ניתוח שבועי לפי יום</b><div class="small">לחץ על יום כדי לראות מה אכלת. כבה יום חלקי כדי שלא ייכנס לממוצע, או מחק אותו לחלוטין.</div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
  }else if(analysisRange==='month'){
   let atCurrent=analysisMonthKey===currentMonthKey();
-  selector=`<div class="analysis-card"><b>מעקב חודשי לפי יום</b><div class="month-toolbar"><button type="button" onclick="shiftAnalysisMonth(-1)">הקודם</button><strong>${analysisMonthLabel(analysisMonthKey)}</strong><button type="button" ${atCurrent?'disabled style="opacity:.4"':''} onclick="shiftAnalysisMonth(1)">הבא</button></div><div class="small">לחץ על יום להצגת הארוחות. יום שכיבית נשמר, אך אינו נכנס לממוצע החודשי.</div><div class="month-export-actions"><button type="button" onclick="downloadMonthlyExcel()">ייצא לאקסל</button><button type="button" style="background:#6b7280" onclick="shareMonthlyReport()">שלח במייל</button></div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
+  selector=`<div class="analysis-card"><b>מעקב חודשי לפי יום</b><div class="month-toolbar"><button type="button" onclick="shiftAnalysisMonth(-1)">הקודם</button><strong>${analysisMonthLabel(analysisMonthKey)}</strong><button type="button" ${atCurrent?'disabled style="opacity:.4"':''} onclick="shiftAnalysisMonth(1)">הבא</button></div><div class="small">לחץ על יום להצגת הארוחות. יום שכיבית נשמר, אך אינו נכנס לממוצע החודשי.</div><div class="month-export-actions"><button type="button" onclick="downloadMonthlyExcel()">ייצא לאקסל</button><button type="button" style="background:#6b7280" onclick="shareMonthlyReport()">שלח במייל</button></div>${displayDays.map(renderWeekDayCard).join('')}</div><div class="analysis-card dietitian-panel"><b>🥗 ייעוץ ותוכנית מדיאטנית</b><div class="small">שלח לדיאטנית את הדוח החודשי יחד עם תבנית המלצות. לאחר שתחזיר תוכנית Excel, העלה אותה וסמן לכל שינוי מה אפשר לבצע.</div><div class="dietitian-actions"><button type="button" onclick="sendForDietitianConsultation()">שלח לייעוץ דיאטנית</button><button type="button" style="background:#0f766e" onclick="document.getElementById('dietitianPlanFile').click()">העלה תוכנית Excel</button></div><input id="dietitianPlanFile" class="hide" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onchange="importDietitianPlan(event)">${renderDietitianPlan(analysisMonthKey)}</div>`;
  }
- if(!days.length){historyAnalysis.innerHTML=selector+'<div class="analysis-card">אין ימים שנבחרו לחישוב.</div>';return}
+ if(!days.length){historyAnalysis.innerHTML=selector+'<div class="analysis-card">אין ימים שנבחרו לחישוב.</div>';if(analysisRange==='month')renderDietitianPlanSummary(analysisMonthKey);return}
  let sum={cal:0,p:0,c:0,f:0,v:0,water:0,steps:0};
  days.forEach(d=>{(d.entries||[]).forEach(e=>{sum.cal+=n(e.cal);sum.p+=n(e.p);sum.c+=n(e.c);sum.f+=n(e.f);sum.v+=n(e.v)});sum.water+=n(d.water);sum.steps+=n(d.steps)});
  let count=days.length;
- historyAnalysis.innerHTML=selector+`<div class="analysis-card"><b>ממוצע לפי ${count} ימים שנבחרו</b><br>ממוצע קלוריות: ${r(sum.cal/count)}<br>ממוצע חלבון: ${r(sum.p/count)} גרם<br>ממוצע פחמימה: ${r(sum.c/count)} גרם<br>ממוצע שומן: ${r(sum.f/count)} גרם<br>ממוצע ירקות: ${r(sum.v/count)} גרם<br>ממוצע מים: ${r(sum.water/count)} מ״ל<br>ממוצע צעדים: ${Math.round(sum.steps/count)}</div>`
+ historyAnalysis.innerHTML=selector+`<div class="analysis-card"><b>ממוצע לפי ${count} ימים שנבחרו</b><br>ממוצע קלוריות: ${r(sum.cal/count)}<br>ממוצע חלבון: ${r(sum.p/count)} גרם<br>ממוצע פחמימה: ${r(sum.c/count)} גרם<br>ממוצע שומן: ${r(sum.f/count)} גרם<br>ממוצע ירקות: ${r(sum.v/count)} גרם<br>ממוצע מים: ${r(sum.water/count)} מ״ל<br>ממוצע צעדים: ${Math.round(sum.steps/count)}</div>`;if(analysisRange==='month')renderDietitianPlanSummary(analysisMonthKey)
 }
 
 async function voice(){
