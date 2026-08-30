@@ -64,6 +64,18 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .month-toolbar strong{text-align:center;font-size:18px}
 .month-export-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
 .month-export-actions button{margin:0}
+.read-only-banner{position:sticky;top:0;z-index:20;background:#fff7ed;color:#9a3412;border:2px solid #fdba74;border-radius:16px;padding:11px;margin:8px 0;font-weight:900;text-align:center}
+.share-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.share-actions button{margin:0}
+.read-only-mode button:disabled,.read-only-mode input:disabled,.read-only-mode select:disabled,.read-only-mode textarea:disabled{opacity:.55;cursor:not-allowed}
+.tutorial-overlay{position:fixed;inset:0;background:rgba(15,23,42,.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:18px}
+.tutorial-overlay.hide{display:none}
+.tutorial-panel{width:min(520px,100%);background:#fff;border-radius:24px;padding:18px;box-shadow:0 24px 70px rgba(0,0,0,.28)}
+.tutorial-slide{min-height:300px;background:linear-gradient(150deg,#eff6ff,#f8fafc);border:2px solid #bfdbfe;border-radius:20px;padding:24px 18px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.tutorial-icon{font-size:58px;line-height:1;margin-bottom:14px}.tutorial-slide h2{margin:0 0 12px;font-size:27px}.tutorial-slide p{margin:0;line-height:1.65;font-size:17px;color:#475569;font-weight:700}
+.tutorial-progress{display:flex;justify-content:center;gap:7px;margin:14px 0}.tutorial-dot{width:10px;height:10px;border-radius:50%;background:#cbd5e1}.tutorial-dot.on{background:#0b82ff;transform:scale(1.25)}
+.tutorial-controls{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}.tutorial-controls button{margin:0}.tutorial-close{background:#6b7280!important;margin-top:8px!important}
+.chat-suggestions{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}.chat-suggestions button{width:auto;margin:0;padding:9px 11px;background:#eef2ff;color:#3730a3;font-size:13px}
 .entry{border-top:1px solid var(--b);padding:12px 0;display:grid;grid-template-columns:1fr auto;gap:10px}.entry:first-child{border-top:0}.del{background:#fee2e2;color:#b91c1c;width:auto;margin:0;padding:8px 10px}
 .meal-group{border:1px solid var(--b);border-radius:18px;margin:10px 0;background:#fbfdff;overflow:hidden}
 .meal-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px;cursor:pointer}
@@ -144,15 +156,16 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="small" id="date"></div>
 
 <section id="pProfile" class="page on">
+<div class="card"><h2>🎬 הדרכה לאפליקציה</h2><div class="small">הצגה קצרה של כל האפשרויות, בהפעלה אוטומטית או במעבר ידני.</div><button class="tutorial-open" onclick="openTutorial()">▶ מה אפשר לעשות באפליקציה?</button></div>
 <div class="card">
 <h2>👤 רישום ראשוני</h2>
 <div class="grid2">
-<div><label>גיל</label><input id="age" inputmode="decimal" value="63"></div>
-<div><label>משקל נוכחי ק״ג</label><input id="weight" inputmode="decimal" value="83.5"></div>
+<div><label>גיל</label><input id="age" inputmode="decimal" placeholder="לדוגמה 40"></div>
+<div><label>משקל נוכחי ק״ג</label><input id="weight" inputmode="decimal" placeholder="לדוגמה 75"></div>
 </div>
 <div class="grid2">
-<div><label>גובה ס״מ</label><input id="height" inputmode="decimal" value="174"></div>
-<div><label>יעד משקל ק״ג</label><input id="goalWeight" inputmode="decimal" value="78"></div>
+<div><label>גובה ס״מ</label><input id="height" inputmode="decimal" placeholder="לדוגמה 170"></div>
+<div><label>יעד משקל ק״ג</label><input id="goalWeight" inputmode="decimal" placeholder="לדוגמה 70"></div>
 </div>
 <div class="grid2">
 <div><label>מין</label><select id="gender"><option value="male">גבר</option><option value="female">אישה</option></select></div>
@@ -191,7 +204,14 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="grid3"><button onclick="loginUser(loginEmail.value,loginPassword.value)">התחברות</button><button onclick="registerUser(loginEmail.value,loginPassword.value)">הרשמה</button><button style="background:#ef4444" onclick="logoutUser()">התנתקות</button></div>
 <button style="background:#6b7280" onclick="resetPassword(loginEmail.value)">🔑 שכחתי סיסמה</button>
 <div class="small">הזן את כתובת האימייל ולחץ על "שכחתי סיסמה". Firebase ישלח קישור לאיפוס.</div>
+<div class="small">כל חשבון שומר פרופיל, ארוחות ומעקב נפרדים. הנתונים של משתמש אחד אינם מוצגים או נשמרים בחשבון אחר.</div>
 <div id="authStatus" class="notice">לא מחובר</div></div>
+<div class="card">
+<h2>🔗 שיתוף האפליקציה</h2>
+<div class="small">בחר קישור ריק להרשמה, או צור צילום לקריאה בלבד של הנתונים שלך. מי שמקבל קישור צפייה לא יכול לשנות את החשבון שלך.</div>
+<div class="share-actions"><button onclick="copyCleanRegistrationLink()">קישור ריק להרשמה</button><button onclick="createReadOnlyShareLink()">קישור לצפייה בנתונים שלי</button></div>
+<div id="shareStatus" class="notice">יש להתחבר כדי ליצור קישור עם הנתונים שלך.</div>
+</div>
 </section>
 
 <section id="pToday" class="page">
@@ -221,9 +241,9 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <div class="chiprow" style="margin-bottom:15px;border-bottom:1px solid var(--b);padding-bottom:10px">
 <button class="chip meal-chip on" onclick="setMeal('בוקר',this)">בוקר</button><button class="chip meal-chip" onclick="setMeal('צהריים',this)">צהריים</button><button class="chip meal-chip" onclick="setMeal('ערב',this)">ערב</button><button class="chip meal-chip" onclick="setMeal('ביניים',this)">ביניים</button>
 </div>
-<label>הזנה מהירה</label>
+<label>מה אכלתי?</label>
 <div class="quick">
-<div class="suggest"><input id="quick" oninput="suggest()" placeholder="קוטג 3 כפות / קוטג 150 / חלב 200"><div id="sbox" class="suggestbox hide"></div></div>
+<div class="suggest"><input id="quick" oninput="suggest()" placeholder="פריט אחד או ארוחה מלאה, למשל: 2 ביצים, סלט ופרוסת לחם"><div id="sbox" class="suggestbox hide"></div></div>
 <button class="mic" onclick="voice()">🎙️</button>
 <button class="mic" title="צילום ארוחה" onclick="document.getElementById('aiCamera').click()">📷</button>
 <button class="mic" title="ארוחה מהגלריה" onclick="document.getElementById('aiGallery').click()">🖼️</button>
@@ -231,10 +251,10 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <input type="file" id="aiGallery" accept="image/*" class="hide" onchange="uploadImage(event,'meal')">
 <input type="file" id="labelImage" accept="image/*" class="hide" onchange="uploadImage(event,'label')">
 </div>
-<div class="grid2"><button id="quickAnalyzeBtn" onclick="analyzeQuickWithGemini()">בדוק עם Gemini</button><button style="background:#6b7280" onclick="clearAiReview()">נקה</button></div>
-<button style="background:#0f766e;margin-top:10px" onclick="document.getElementById('labelImage').click()">🏷️ סריקת תווית מוצר או אריזה</button>
+<div class="grid2"><button id="quickAnalyzeBtn" onclick="analyzeQuickWithGemini()">בדוק ופצל לפריטים</button><button style="background:#6b7280" onclick="clearAiReview()">נקה</button></div>
+<button style="background:#0f766e;margin-top:10px" onclick="document.getElementById('labelImage').click()">🏷️ סריקה מתווית</button>
 <div id="msg" class="notice hide"></div>
-<div id="aiEditBox" class="notice hide"></div><div class="notice" style="margin-top:8px"><b>📷 אין אפשרות לשקול?</b> צלם את הארוחה. Gemini יזהה מאכלים וכמויות, לאחר מכן תוצג השוואה מול ערכים שאישרת ומול MABAT. דבר לא יישמר לפני אישורך.</div>
+<div id="aiEditBox" class="notice hide"></div><div class="notice" style="margin-top:8px"><b>אפשר להזין הכול במקום אחד:</b> פריט אחד או ארוחה מלאה בהקלדה, בקול או בצילום. לסריקת הערכים המודפסים על אריזה לחץ „סריקה מתווית”. דבר לא יישמר לפני אישורך.</div>
 </div>
 
 <div class="card manual-card">
@@ -279,11 +299,6 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
   <button style="background:#eef2ff;color:#3730a3" onclick="manualFindFromDb()">🗂️ מאגר</button>
 </div>
 
-<details style="margin-top:10px">
-  <summary style="cursor:pointer;font-weight:800;color:var(--muted)">הזנה מרובה / כמה פריטים</summary>
-  <textarea id="bulkFoodText" rows="4" placeholder="פיתה 105 גרם&#10;גבינה צהובה 20 גרם&#10;ביצה L"></textarea>
-  <div class="grid2"><button style="background:#6b7280" onclick="parseBulkLocal()">פירוק לפי מאגר</button><button style="background:#f59e0b" onclick="parseBulkWithAi()">פירוק מלא ב-AI</button></div>
-</details>
 </div>
 
 <div class="card"><h2>⭐ ארוחות קבועות</h2><div class="small">תן לארוחה שם ברור, למשל „סלט, ביצה וטוסט”. הצגת ארוחה קבועה אינה מוסיפה אותה ליומן. השמירה מתבצעת רק לאחר בחירת ארוחה מפורשת.</div><label for="fixedMealName" style="margin-top:12px">שם הארוחה הקבועה</label><input id="fixedMealName" placeholder="לדוגמה: סלט, ביצה וטוסט"><div class="grid2"><button onclick="saveCurrentMealAsFixed()">⭐ שמור לקבועות</button><button style="background:#6b7280" onclick="document.getElementById('fixedMealPhoto').click()">📷 שמור עם תמונה</button></div><input type="file" id="fixedMealPhoto" accept="image/*" class="hide" onchange="saveFixedMealWithPhoto(event)"><div id="fixedMealsBox" class="notice"></div><button style="background:#ef4444" onclick="clearFixedMeals()">נקה קבועות</button></div>
@@ -319,7 +334,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 </section>
 
 
-<section id="pChat" class="page"><div class="card"><h2>💬 צ׳אט תזונה ואימון</h2><div class="small">שאל: כמה חלבון נשאר לי? מה לאכול בארוחה הבאה?</div><div id="chatLog" class="chatbox"></div><textarea id="chatInput" rows="3" placeholder="כתוב שאלה..."></textarea><div class="grid2"><button onclick="askCoachChat()">שאל AI</button><button style="background:#6b7280" onclick="localCoachAnswer()">תשובה מקומית</button></div></div></section>
+<section id="pChat" class="page"><div class="card"><h2>💬 צ׳אט תזונה מתקדם</h2><div class="small">הצ׳אט מתבסס על היעדים שלך ועל כל הארוחות והכמויות שנצברו היום. הוא מציע מה לאכול בהמשך לפי מה שחסר או לפי חריגה.</div><div class="chat-suggestions"><button onclick="askSuggestedChat('מה כדאי לי לאכול עכשיו?')">מה לאכול עכשיו?</button><button onclick="askSuggestedChat('בנה לי ארוחה הבאה לפי מה שחסר לי היום')">בנה ארוחה לפי החסר</button><button onclick="askSuggestedChat('בדוק האם חרגתי היום ומה כדאי לעשות בארוחה הבאה')">בדוק חריגה</button></div><div id="chatLog" class="chatbox"></div><textarea id="chatInput" rows="3" placeholder="לדוגמה: מה כדאי לי לאכול בארוחת הערב?"></textarea><div class="grid2"><button onclick="askCoachChat()">קבל הצעה אישית</button><button style="background:#6b7280" onclick="localCoachAnswer()">הצג מה נשאר היום</button></div></div></section>
 <section id="pLog" class="page">
 <div class="card"><h2>🧾 יומן</h2><div id="entries"></div></div>
 </section>
@@ -335,6 +350,15 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <button id="tChat" onclick="show('Chat')"><span class="ico">💬</span>צ׳אט</button>
 </nav>
 
+<div id="tutorialOverlay" class="tutorial-overlay hide" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle" onclick="if(event.target===this)closeTutorial()">
+ <div class="tutorial-panel">
+  <div id="tutorialSlide" class="tutorial-slide"></div>
+  <div id="tutorialProgress" class="tutorial-progress"></div>
+  <div class="tutorial-controls"><button class="tutorial-control" onclick="tutorialPrevious()">הקודם</button><button id="tutorialPlayButton" class="tutorial-control" onclick="toggleTutorialPlay()">▶ ניגון אוטומטי</button><button class="tutorial-control" onclick="tutorialNext()">הבא</button></div>
+  <button class="tutorial-control tutorial-close" onclick="closeTutorial()">סגור הדרכה</button>
+ </div>
+</div>
+
 <script src="./mabat-data-1.js"></script>
 <script src="./mabat-data-2.js"></script>
 <script src="./mabat-data-3.js"></script>
@@ -345,13 +369,37 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 <script src="./mabat-data-8.js"></script>
 <script>
 function localDateKey(){let d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-const KEY='healthy_life_fixed_dual_calc_v1';
-const base={profile:{age:63,weight:83.5,height:174,goalWeight:78,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
-let st=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(base);
+const LEGACY_KEY='healthy_life_fixed_dual_calc_v1';
+const GUEST_KEY='healthy_life_guest_v2';
+const base={profile:{age:0,weight:0,height:0,goalWeight:0,gender:'male',activity:1.375,goal:'cut',saved:false,coach:'רגיל'},targets:{calories:1750,protein:95,carbs:170,fat:55,veg:500,water:2400},dateKey:localDateKey(),history:{},water:0,steps:0,entries:[],workouts:[],currentMeal:'בוקר',fixedMeals:[],approvedFoods:[],mabat:[]};
+function safeStoredState(key){try{let value=JSON.parse(localStorage.getItem(key)||'null');return value&&typeof value==='object'?value:null}catch{return null}}
+function freshState(){return structuredClone(base)}
+function userStorageKey(uid){return 'healthy_life_user_v2_'+uid}
+let activeStorageKey=GUEST_KEY;
+let st=safeStoredState(GUEST_KEY)||freshState();
+let readOnlyMode=false;
 let manualMode='serving';
 let analysisRange='week';
 let openHistoryDayDate='';
 let analysisMonthKey=localDateKey().slice(0,7);
+const tutorialSlides=[
+ {icon:'🔐',title:'1. התחברות או הרשמה',text:'נכנסים עם אימייל וסיסמה. משתמש חדש נרשם ומקבל חשבון ריק ונפרד. הנתונים של משתמש אחד אינם משפיעים על משתמש אחר.'},
+ {icon:'👤',title:'2. פרופיל ויעדים אישיים',text:'מזינים גיל, משקל, גובה, יעד ורמת פעילות. האפליקציה מחשבת יעד יומי של קלוריות, חלבון, פחמימות ושומן.'},
+ {icon:'🥗',title:'3. מה אכלתי?',text:'בוחרים בוקר, צהריים, ערב או ביניים. מזינים פריט אחד או ארוחה מלאה בהקלדה, בקול, בצילום או מהגלריה. סריקה מתווית קוראת את הערכים שעל האריזה.'},
+ {icon:'✅',title:'4. בדיקה ואישור',text:'הארוחה מתפצלת לפריטים. לפני השמירה אפשר לתקן לכל פריט את הכמות והיחידה ולבחור התאמה מ-MABAT או USDA.'},
+ {icon:'🏠',title:'5. הצטברות במהלך היום',text:'כל ארוחה מצטרפת ליומן היומי. במסך היום רואים כמה נאכל עד עכשיו וכמה נשאר מהיעדים, כולל מים, צעדים וחלבון.'},
+ {icon:'🧠',title:'6. ניתוח יומי',text:'לוחצים „נתח את היום”. האפליקציה בודקת את צבר הארוחות ומציגה חוסרים או חריגות והמלצה כיצד לאזן את הארוחה הבאה.'},
+ {icon:'💬',title:'7. צ׳אט תזונה מתקדם',text:'הצ׳אט קורא את כל הארוחות והכמויות שנשמרו היום. אפשר לשאול מה לאכול עכשיו ולקבל הצעות לפי הקלוריות והחלבון שנותרו או לפי חריגה.'},
+ {icon:'📊',title:'8. מעקב ושיתוף',text:'עוקבים לפי שבוע וחודש, פותחים ימים ומייצאים דוח. אפשר לשתף קישור ריק להרשמה או צילום נתונים לצפייה בלבד.'}
+];
+let tutorialSlideIndex=0,tutorialTimer=null;
+function renderTutorial(){let slide=tutorialSlides[tutorialSlideIndex],box=document.getElementById('tutorialSlide');if(!box)return;box.innerHTML=`<div class="tutorial-icon">${slide.icon}</div><h2 id="tutorialTitle">${slide.title}</h2><p>${slide.text}</p>`;document.getElementById('tutorialProgress').innerHTML=tutorialSlides.map((_,i)=>`<span class="tutorial-dot ${i===tutorialSlideIndex?'on':''}"></span>`).join('')}
+function openTutorial(){tutorialSlideIndex=0;renderTutorial();document.getElementById('tutorialOverlay').classList.remove('hide')}
+function stopTutorial(){clearInterval(tutorialTimer);tutorialTimer=null;let button=document.getElementById('tutorialPlayButton');if(button)button.textContent='▶ ניגון אוטומטי'}
+function closeTutorial(){stopTutorial();document.getElementById('tutorialOverlay').classList.add('hide')}
+function tutorialNext(){tutorialSlideIndex=(tutorialSlideIndex+1)%tutorialSlides.length;renderTutorial()}
+function tutorialPrevious(){tutorialSlideIndex=(tutorialSlideIndex-1+tutorialSlides.length)%tutorialSlides.length;renderTutorial()}
+function toggleTutorialPlay(){if(tutorialTimer){stopTutorial();return}document.getElementById('tutorialPlayButton').textContent='⏸ עצור';tutorialTimer=setInterval(tutorialNext,4500)}
 
 const MABAT_EMBEDDED=[].concat(window.MABAT_CHUNK_1,window.MABAT_CHUNK_2,window.MABAT_CHUNK_3,window.MABAT_CHUNK_4,window.MABAT_CHUNK_5,window.MABAT_CHUNK_6,window.MABAT_CHUNK_7,window.MABAT_CHUNK_8);
 const foods=[
@@ -393,7 +441,25 @@ function appKeyboardKey(k){if(k==='⌫')appKeyboardValue=appKeyboardValue.slice(
 function closeAppKeyboard(){let el=document.getElementById('appKeyboard');if(el)el.classList.add('hide');appKeyboardSave=null}
 function saveAppKeyboard(){let cb=appKeyboardSave,val=appKeyboardValue.trim();closeAppKeyboard();if(cb)cb(val)}
 function editManualFoodName(){openAppKeyboard('עריכת שם המאכל',mName.value,'text',val=>{if(val)mName.value=val})}
-function save(){localStorage.setItem(KEY,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
+function save(){if(readOnlyMode)return;localStorage.setItem(activeStorageKey,JSON.stringify(st));if(window.__cloudSaveHook)window.__cloudSaveHook()}
+function syncProfileForm(){
+ let p=st.profile||{};
+ document.getElementById('age').value=n(p.age)||'';
+ document.getElementById('weight').value=n(p.weight)||'';
+ document.getElementById('height').value=n(p.height)||'';
+ document.getElementById('goalWeight').value=n(p.goalWeight)||'';
+ document.getElementById('gender').value=p.gender||'male';
+ document.getElementById('activity').value=String(p.activity||1.375);
+ document.getElementById('goal').value=p.goal||'cut';
+ let provider=document.getElementById('aiProvider');if(provider)provider.value=p.aiProvider||'auto';
+}
+function switchStoredState(key,nextState,persist=true){activeStorageKey=key;st=nextState&&typeof nextState==='object'?structuredClone(nextState):freshState();if(persist)localStorage.setItem(activeStorageKey,JSON.stringify(st));syncProfileForm()}
+function applyReadOnlyUi(){
+ if(!readOnlyMode)return;
+ document.body.classList.add('read-only-mode');
+ if(!document.getElementById('readOnlyBanner')){let banner=document.createElement('div');banner.id='readOnlyBanner';banner.className='read-only-banner';banner.textContent='מצב צפייה בלבד - זהו צילום נתונים משותף ולא ניתן לשנות את החשבון המקורי';document.querySelector('.app')?.prepend(banner)}
+ document.querySelectorAll('button,input,select,textarea').forEach(el=>{let allowed=el.closest('nav')||el.matches('#pAnalysis .mode-btn,.month-toolbar button,.month-export-actions button,.tutorial-open,.tutorial-control');if(!allowed)el.disabled=true});
+}
 function mealForCurrentTime(){let h=new Date().getHours();if(h>=4&&h<11)return 'בוקר';if(h>=11&&h<16)return 'צהריים';if(h>=16&&h<21)return 'ערב';return 'ביניים'}
 function syncMealChips(){document.querySelectorAll('.meal-chip').forEach(c=>c.classList.toggle('on',c.textContent.trim()===st.currentMeal))}
 function show(p){if(p==='Food'&&!pendingAiFoods.length){st.currentMeal=mealForCurrentTime();save()}document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));document.getElementById('p'+p).classList.add('on');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));let t=document.getElementById('t'+p);if(t)t.classList.add('on');render();if(p==='Food')syncMealChips()}
@@ -409,7 +475,7 @@ function ensureToday(){let k=todayKey();if(st.dateKey!==k){let archived=st.histo
 function entryAmountText(e){let entered=n(e?.enteredAmount),enteredUnit=e?.enteredUnit;if(entered>0&&enteredUnit)return `${r(entered)} ${unitName[enteredUnit]||enteredUnit} (≈ ${r(e.amount)} גרם/מ״ל)`;return `${r(e.amount)} ${e.unit||'ג׳'}`}
 function render(){ensureToday();date.textContent=healthDayDate().toLocaleDateString('he-IL');coachStyle.value=st.profile.coach||'רגיל';let t=totals(),g=st.targets;progress.innerHTML=bar('קלוריות',t.cal,g.calories)+bar('חלבון',t.p,g.protein)+bar('פחמימה',t.c,g.carbs)+bar('שומן',t.f,g.fat);let totalWater=n(st.water)+n(t.w);waterText.textContent=`${r(totalWater)} / ${g.water} מ״ל`;waterFill.style.width=Math.min(100,totalWater/g.water*100)+'%';coach.textContent=coachMsg(t,g);stepsDisp.textContent=st.steps||0;entries.innerHTML=st.entries.map(e=>`<div class=entry><div><b>${e.name}</b><div class=small>${e.meal||''} - ${entryAmountText(e)} - ${r(e.cal)} קל׳ | חלבון ${r(e.p)} | פחמימה ${r(e.c)} | שומן ${r(e.f)}</div></div><button class=del onclick="delE('${e.id}')">מחק</button></div>`).join('')||'<div class=notice>אין רשומות היום.</div>';workouts.innerHTML=st.workouts.map(w=>`<div class=entry><div><b>${w.type}</b><div class=small>${w.min} דקות</div></div><button class=del onclick="delW('${w.id}')">מחק</button></div>`).join('')||'<div class=notice>אין אימונים היום.</div>';manualPreview();renderMealJournal();renderHistoryAnalysis();save()}
 function coachMsg(t,g){if(t.cal>g.calories*1.05)return 'חריגה בקלוריות. מומלץ לאזן בארוחה הבאה.';if(t.p<g.protein*.6)return 'חסר חלבון יחסית ליעד היומי.';return 'מצב תקין. המשך לעדכן כמויות מדויקות.'}
-function saveProfile(){let age=n(document.getElementById('age').value),w=n(weight.value),h=n(height.value),act=n(activity.value);let bmr=gender.value==='male'?10*w+6.25*h-5*age+5:10*w+6.25*h-5*age-161;let cal=bmr*act;if(goal.value==='cut')cal-=350;if(goal.value==='bulk')cal+=250;st.profile={...st.profile,age,weight:w,height:h,goalWeight:n(goalWeight.value),gender:gender.value,activity:act,goal:goal.value,saved:true};st.targets.calories=Math.round(cal);st.targets.protein=Math.round(w*1.6);st.targets.carbs=Math.round(cal*.42/4);st.targets.fat=Math.round(cal*.28/9);profileResult.textContent=`יעד יומי: ${st.targets.calories} קלוריות, חלבון ${st.targets.protein} גרם`;save();}
+function saveProfile(){let age=n(document.getElementById('age').value),w=n(weight.value),h=n(height.value),act=n(activity.value);if(age<=0||w<=0||h<=0){profileResult.textContent='יש למלא גיל, משקל וגובה תקינים';profileResult.className='notice err';return}let bmr=gender.value==='male'?10*w+6.25*h-5*age+5:10*w+6.25*h-5*age-161;let cal=bmr*act;if(goal.value==='cut')cal-=350;if(goal.value==='bulk')cal+=250;st.profile={...st.profile,age,weight:w,height:h,goalWeight:n(goalWeight.value),gender:gender.value,activity:act,goal:goal.value,saved:true};st.targets.calories=Math.round(cal);st.targets.protein=Math.round(w*1.6);st.targets.carbs=Math.round(cal*.42/4);st.targets.fat=Math.round(cal*.28/9);profileResult.textContent=`יעד יומי: ${st.targets.calories} קלוריות, חלבון ${st.targets.protein} גרם`;profileResult.className='notice ok';save();}
 // ===== UPGRADED ENGINE =====
 let pendingAiFoods=[],pendingAiPhoto='',activeRecorder=null,voiceChunks=[];
 function normalizeHebrewNumbers(text){return String(text||'').replace(/חצי כוס/g,'0.5 כוס').replace(/חצי כפית/g,'0.5 כפית').replace(/חצי כף/g,'0.5 כף').replace(/כוס וחצי/g,'1.5 כוס').replace(/כף וחצי/g,'1.5 כף').replace(/כפית וחצי/g,'1.5 כפית').replace(/אחד/g,'1').replace(/אחת/g,'1').replace(/שתי/g,'2').replace(/שתיים/g,'2').replace(/שניים/g,'2').replace(/שלוש/g,'3').replace(/ארבע/g,'4').replace(/חמש/g,'5').replace(/שש/g,'6').replace(/שבע/g,'7').replace(/שמונה/g,'8').replace(/תשע/g,'9').replace(/עשר/g,'10')}
@@ -577,7 +643,7 @@ async function searchUsdaForFood(i){
 function rememberApprovedFood(food,photo){st.approvedFoods=st.approvedFoods||[];let approved={...food,a:[...new Set([food.name,...(food.a||[])])],src:food.src==='USDA FoodData Central'?'USDA FoodData Central - אושר על ידי המשתמש':'אושר על ידי המשתמש',approvedAt:new Date().toISOString(),photo:photo||''};let idx=st.approvedFoods.findIndex(x=>clean(x.name)===clean(food.name));if(idx>=0)st.approvedFoods[idx]=approved;else st.approvedFoods.unshift(approved)}
 async function confirmAiFoods(){if(confirmAiFoods.saving||!pendingAiFoods.length)return;confirmAiFoods.saving=true;let button=document.querySelector('#aiEditBox .compare-actions button');if(button){button.disabled=true;button.textContent='שומר...'}let count=pendingAiFoods.length,meal=st.currentMeal;try{pendingAiFoods.forEach(x=>{if(n(x.draftAmount)>0)x.amount=n(x.draftAmount);delete x.draftAmount;let food=selectedComparisonFood(x),grams=comparisonGrams(x);addEntry(food,grams,{amount:x.amount,unit:comparisonUnit(x)});rememberApprovedFood(food,pendingAiPhoto)});save();if(typeof window.forceCloudSave==='function')await window.forceCloudSave();clearAiReview();render();msg(`${count} פריטים אושרו, הכמות נשמרה ונוספו ל-${meal}.`,'ok')}catch(e){save();render();msg('הפריט נשמר במכשיר, אך הסנכרון לענן נכשל. נסה שוב בעוד רגע.','err');console.error('meal confirmation cloud save failed',e)}finally{confirmAiFoods.saving=false}}
 function clearAiReview(){pendingAiFoods=[];pendingAiPhoto='';quick.value='';aiEditBox.innerHTML='';aiEditBox.classList.add('hide');msg('',0);sbox.classList.add('hide')}
-async function analyzeQuickWithGemini(){let text=(quick.value||'').trim();if(!text){msg('כתוב או אמור מה אכלת','err');return}let btn=document.getElementById('quickAnalyzeBtn');btn.classList.add('loading-btn');btn.textContent='Gemini בודק...';msg('Gemini מזהה את המאכל והכמות...','ok');try{prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}finally{btn.classList.remove('loading-btn');btn.textContent='בדוק עם Gemini'}}
+async function analyzeQuickWithGemini(){let text=(quick.value||'').trim();if(!text){msg('כתוב או אמור מה אכלת','err');return}let btn=document.getElementById('quickAnalyzeBtn');btn.classList.add('loading-btn');btn.textContent='מזהה ומפצל...';msg('Gemini מזהה את המאכלים והכמויות...','ok');try{prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}finally{btn.classList.remove('loading-btn');btn.textContent='בדוק ופצל לפריטים'}}
 async function parseBulkWithAi(){let text=(bulkFoodText.value||quick.value||'').trim();if(!text){msg('אין טקסט לשליחה ל-Gemini','err');return}try{msg('Gemini מנתח...','ok');prepareAiComparison(await requestFoodAnalysis(text))}catch(e){msg('Gemini נכשל: '+e.message,'err')}}
 async function searchManualWithAi(){let text=`${mName.value} ${mAmount.value} ${unitName[mUnit.value]||mUnit.value}`;try{msg('Gemini בודק ולאחר מכן משווה למאגר...','ok');let arr=await requestFoodAnalysis(text);prepareAiComparison(arr)}catch(e){msg('Gemini נכשל: '+e.message,'err')}}
 async function uploadImage(e,mode='meal'){
@@ -612,11 +678,12 @@ function deleteFixedMeal(id){if(confirm('למחוק את הארוחה הקבוע
 function clearFixedMeals(){if(confirm('לנקות את כל הארוחות הקבועות?')){st.fixedMeals=[];render();save()}}
 function renderFixedMeals(){let el=document.getElementById('fixedMealsBox');if(!el)return;let arr=st.fixedMeals||[];if(!arr.length){el.innerHTML='אין ארוחות קבועות. בחר ארוחה למעלה והזן מזונות, כתוב שם ברור ואז שמור אותה כאן.';return}let esc=value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');el.innerHTML=arr.map(m=>{let s=m.items.reduce((a,e)=>(a.cal+=n(e.cal),a.p+=n(e.p),a.c+=n(e.c),a.f+=n(e.f),a),{cal:0,p:0,c:0,f:0}),isOpen=Number(m.id)===Number(openFixedMealId),preview=isOpen?`<div style="width:100%;margin-top:10px;padding:12px;border:2px solid #bfdbfe;border-radius:16px;background:#f8fbff"><b style="font-size:18px">מה יש בארוחה?</b><div style="margin-top:8px">${m.items.map(e=>`<div style="padding:6px 0;border-bottom:1px solid #dbeafe"><b>${esc(e.name)}</b> - ${r(e.amount)} ${esc(e.unit||'גרם')} | ${r(e.cal)} קל׳</div>`).join('')}</div><div style="margin-top:12px;font-weight:900">בחר לאיזו ארוחה לשמור:</div><div class="ai-meal-target-choices">${['בוקר','צהריים','ערב','ביניים'].map(meal=>`<button type="button" class="${meal===fixedMealTarget?'on':''}" onclick="chooseFixedMealTarget('${meal}')">${meal}</button>`).join('')}</div><button type="button" ${fixedMealTarget?'':'disabled'} style="margin-top:10px;${fixedMealTarget?'':'opacity:.45'}" onclick="loadFixedMeal(${m.id},'${fixedMealTarget}')">${fixedMealTarget?'שמור ל'+fixedMealTarget:'בחר ארוחה כדי לשמור'}</button><button type="button" style="background:#6b7280" onclick="closeFixedMealPreview()">סגור בלי לשמור</button><div class="small" style="margin-top:7px">אין בחירה אוטומטית לפי השעה. רק הבחירה שלך נשמרת.</div></div>`:'';return `<div class="entry fixed-meal-card"><div class="fixed-meal-summary">${m.photo?`<img src="${m.photo}" style="width:72px;height:58px;object-fit:cover;border-radius:12px;flex:none">`:''}<div><b style="font-size:18px;overflow-wrap:anywhere">${esc(m.name||'ללא שם')}</b><div class=small>${m.items.length} פריטים | ${r(s.cal)} קל׳ | חלבון ${r(s.p)} | פחמימה ${r(s.c)} | שומן ${r(s.f)}</div></div></div><div class="entry-actions fixed-meal-actions"><button class=chip onclick="showFixedMeal(${m.id})">👁️ הצג</button><button class=chip onclick="renameFixedMeal(${m.id})">✏️ שנה שם</button><button class=del onclick="deleteFixedMeal(${m.id})">מחק</button></div>${preview}</div>`}).join('')}
 async function fetchMabat(){mabatStatus.className='notice ok';mabatStatus.textContent='MABAT מוטמע מקומית: '+MABAT_EMBEDDED.length+' פריטים. אין צורך בטעינה.'}
-function addChat(role,text){chatLog.innerHTML+=`<div class="bubble ${role==='user'?'userbubble':'aibubble'}">${text}</div>`;chatLog.scrollTop=chatLog.scrollHeight}
-function buildContext(){let t=totals();return `יעדים: קלוריות ${st.targets.calories}, חלבון ${st.targets.protein}, פחמימה ${st.targets.carbs}, שומן ${st.targets.fat}. צריכה היום: קלוריות ${r(t.cal)}, חלבון ${r(t.p)}, פחמימה ${r(t.c)}, שומן ${r(t.f)}, מים ${st.water}. רשומות: ${(st.entries||[]).map(e=>`${e.meal} ${e.name} ${r(e.amount)} ${e.unit} ${r(e.cal)} קל׳`).join('; ')}`}
-async function askCoachChat(){let q=chatInput.value.trim();if(!q)return;addChat('user',q);chatInput.value='';try{let ans=await callGeminiText(`ענה בעברית קצר ומעשי לפי הנתונים:\n${buildContext()}\nשאלה: ${q}`);addChat('ai',ans)}catch(e){addChat('ai','AI לא זמין: '+e.message)}}
+function addChat(role,text){let safe=escapeHtml(text).replace(/\n/g,'<br>');chatLog.innerHTML+=`<div class="bubble ${role==='user'?'userbubble':'aibubble'}">${safe}</div>`;chatLog.scrollTop=chatLog.scrollHeight}
+function buildContext(){let t=totals(),g=st.targets||{},remaining={cal:r(n(g.calories)-t.cal),p:r(n(g.protein)-t.p),c:r(n(g.carbs)-t.c),f:r(n(g.fat)-t.f)};return `שעה: ${new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}. יעד יומי: קלוריות ${g.calories}, חלבון ${g.protein}, פחמימה ${g.carbs}, שומן ${g.fat}. צריכה מצטברת היום: קלוריות ${r(t.cal)}, חלבון ${r(t.p)}, פחמימה ${r(t.c)}, שומן ${r(t.f)}, מים ${r(n(st.water)+n(t.w))}. נשאר או חרג: קלוריות ${remaining.cal}, חלבון ${remaining.p}, פחמימה ${remaining.c}, שומן ${remaining.f}. כל הארוחות שנשמרו היום: ${(st.entries||[]).map(e=>`${e.meal} - ${e.name}, ${r(e.amount)} ${e.unit}, ${r(e.cal)} קלוריות, חלבון ${r(e.p)}`).join('; ')||'אין עדיין ארוחות שמורות'}`}
+async function askCoachChat(){let q=chatInput.value.trim();if(!q)return;addChat('user',q);chatInput.value='';try{let ans=await callGeminiText(`אתה עוזר תזונה מעשי. הסתמך רק על הנתונים המצטברים שסופקו ואל תמציא ארוחות שלא נרשמו. אם נשאל מה לאכול, הצע 2 עד 3 אפשרויות עם כמויות משוערות שמתאימות למה שנותר היום. אם יש חריגה, הצע ארוחה מאזנת בלי להעניש או להמליץ לדלג על אוכל. ענה בעברית ברורה וקצרה.\n${buildContext()}\nשאלה: ${q}`);addChat('ai',ans)}catch(e){addChat('ai','AI לא זמין: '+e.message)}}
+function askSuggestedChat(question){chatInput.value=question;askCoachChat()}
 function localCoachAnswer(){let t=totals(),g=st.targets;addChat('ai',`נשאר להיום בערך: קלוריות ${r(g.calories-t.cal)}, חלבון ${r(g.protein-t.p)}, פחמימה ${r(g.carbs-t.c)}, שומן ${r(g.fat-t.f)}.`)}
-const oldRender=render;render=function(){oldRender();renderFixedMeals();if(window.mabatStatus){mabatStatus.className='notice ok';mabatStatus.textContent='MABAT מוטמע מקומית: '+MABAT_EMBEDDED.length+' פריטים + יחידות מידה';}}
+const oldRender=render;render=function(){oldRender();renderFixedMeals();if(window.mabatStatus){mabatStatus.className='notice ok';mabatStatus.textContent='MABAT מוטמע מקומית: '+MABAT_EMBEDDED.length+' פריטים + יחידות מידה';}applyReadOnlyUi()}
 
 function addWater(x){ensureToday();st.water+=x;render()}function delE(id){st.entries=st.entries.filter(e=>String(e.id)!==String(id));save();render()}function delW(id){st.workouts=st.workouts.filter(e=>String(e.id)!==String(id));save();render()}
 async function resetMeals(){
@@ -624,7 +691,7 @@ async function resetMeals(){
   st.entries=[];
   if(!st.history) st.history={};
   st.history[todayKey()]={date:todayKey(),entries:[],water:st.water||0,steps:st.steps||0,workouts:st.workouts||[],targets:st.targets};
-  localStorage.setItem(KEY,JSON.stringify(st));
+  save();
   if(window.forceCloudSave) await window.forceCloudSave();
   render();
   alert('הארוחות אופסו בהצלחה');
@@ -637,7 +704,7 @@ async function resetDay(){
   st.workouts=[];
   if(!st.history) st.history={};
   st.history[todayKey()]={date:todayKey(),entries:[],water:0,steps:0,workouts:[],targets:st.targets};
-  localStorage.setItem(KEY,JSON.stringify(st));
+  save();
   if(window.forceCloudSave) await window.forceCloudSave();
   render();
   alert('נתוני היום אופסו בהצלחה');
@@ -967,6 +1034,7 @@ async function voice(){
    activeRecorder.start();msg('מקליט... לחץ שוב על המיקרופון לסיום','ok');setTimeout(()=>{if(activeRecorder?.state==='recording')activeRecorder.stop()},10000);
  }catch(e){msg('לא ניתנה גישה למיקרופון. אשר הרשאת מיקרופון בדפדפן ונסה שוב.','err')}
 }
+syncProfileForm();
 render();
 if(st.profile.saved)show('Today');
 </script>
@@ -976,16 +1044,52 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyAkF2i0utPJayFqhzqWEmGh2hIUGhMJZ2o",authDomain:"healthylife-a054b.firebaseapp.com",projectId:"healthylife-a054b",storageBucket:"healthylife-a054b.firebasestorage.app",messagingSenderId:"307773262968",appId:"1:307773262968:web:7fdc12c7789f3d447ab18d"};
-const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let fbUser=null;
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);let fbUser=null,pendingRegistration=false,authGeneration=0;
+const pageParams=new URLSearchParams(location.search),sharedViewId=pageParams.get('view')||'',registrationLinkMode=pageParams.get('register')==='1';
 function authMsg(t,ok=false){let e=document.getElementById('authStatus');if(e){e.textContent=t;e.className='notice '+(ok?'ok':'err')}}
-window.registerUser=async(email,pw)=>{try{await createUserWithEmailAndPassword(auth,email,pw);authMsg('נרשמת',true)}catch(e){authMsg(e.message,false)}}
+function shareMsg(t,ok=false){let e=document.getElementById('shareStatus');if(e){e.textContent=t;e.className='notice '+(ok?'ok':'err')}}
+function cleanEntryForShare(entry){let {photo,...clean}=entry||{};return clean}
+function shareableState(source){
+ let cutoff=new Date();cutoff.setDate(cutoff.getDate()-366);let min=cutoff.toLocaleDateString('en-CA'),history={};
+ Object.entries(source.history||{}).forEach(([key,day])=>{if(key>=min)history[key]={...day,entries:(day.entries||[]).map(cleanEntryForShare)}});
+ let p=source.profile||{},profile={age:n(p.age),weight:n(p.weight),height:n(p.height),goalWeight:n(p.goalWeight),gender:p.gender||'',activity:n(p.activity),goal:p.goal||'',saved:Boolean(p.saved),coach:p.coach||'רגיל'};
+ return {profile,targets:{...(source.targets||{})},dateKey:source.dateKey||localDateKey(),history,water:n(source.water),steps:n(source.steps),entries:(source.entries||[]).map(cleanEntryForShare),workouts:structuredClone(source.workouts||[]),currentMeal:source.currentMeal||'בוקר',fixedMeals:[],approvedFoods:[],mabat:[],analysisExcludedDates:{...(source.analysisExcludedDates||{})}};
+}
+async function copyText(text){if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return}let area=document.createElement('textarea');area.value=text;document.body.appendChild(area);area.select();document.execCommand('copy');area.remove()}
+window.copyCleanRegistrationLink=async()=>{try{let url=new URL(location.origin+location.pathname);url.searchParams.set('register','1');await copyText(url.toString());shareMsg('הקישור הריק הועתק. הוא נפתח ללא הנתונים שלך ומיועד להרשמה אישית.',true)}catch(e){shareMsg('העתקת הקישור נכשלה: '+e.message,false)}}
+window.createReadOnlyShareLink=async()=>{try{if(!fbUser)throw new Error('יש להתחבר קודם לחשבון שלך');let id=crypto.randomUUID().replaceAll('-',''),data=shareableState(st);await setDoc(doc(db,'shares',id),{ownerId:fbUser.uid,data,active:true,createdAt:new Date().toISOString()});let url=new URL(location.origin+location.pathname);url.searchParams.set('view',id);await copyText(url.toString());shareMsg('קישור הצפייה הועתק. זהו צילום לקריאה בלבד ואינו מאפשר לשנות את הנתונים שלך.',true)}catch(e){shareMsg('יצירת קישור הצפייה נכשלה: '+e.message,false)}}
+async function loadSharedView(id){
+ readOnlyMode=true;authMsg('מצב צפייה בלבד',true);shareMsg('הנתונים המוצגים הם צילום ואינם מחוברים לחשבון המקורי.',true);
+ try{let snap=await getDoc(doc(db,'shares',id));if(!snap.exists()||snap.data().active!==true||!snap.data().data)throw new Error('קישור הצפייה אינו קיים או בוטל');switchStoredState(GUEST_KEY,snap.data().data,false);render();show('Today');applyReadOnlyUi()}
+ catch(e){readOnlyMode=false;authMsg('קישור הצפייה לא נטען: '+e.message,false);switchStoredState(GUEST_KEY,freshState(),false);render();show('Profile')}
+}
+window.registerUser=async(email,pw)=>{try{pendingRegistration=true;await createUserWithEmailAndPassword(auth,email,pw);authMsg('נרשמת. נוצר עבורך פרופיל אישי חדש ונפרד.',true)}catch(e){pendingRegistration=false;authMsg(e.message,false)}}
 window.loginUser=async(email,pw)=>{try{await signInWithEmailAndPassword(auth,email,pw)}catch(e){authMsg(e.message,false)}}
 window.resetPassword=async(email)=>{try{email=(email||'').trim();if(!email)throw new Error('הזן כתובת אימייל');await sendPasswordResetEmail(auth,email);authMsg('נשלח מייל לאיפוס סיסמה ל-'+email,true)}catch(e){authMsg('איפוס סיסמה: '+e.message,false)}}
-window.logoutUser=async()=>signOut(auth);
-window.cloudSave=()=>{clearTimeout(window.__saveT);window.__saveT=setTimeout(async()=>{if(!fbUser||typeof st==='undefined')return;await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})},900)}
-window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);await setDoc(doc(db,'users',fbUser.uid),{email:fbUser.email,data:st,updatedAt:new Date().toISOString()},{merge:true})}
-onAuthStateChanged(auth,async u=>{fbUser=u;if(!u){authMsg('לא מחובר',false);return}authMsg('מחובר: '+u.email,true);let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(snap.exists()&&snap.data().data){Object.assign(st,snap.data().data);save();render()}else await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString()},{merge:true})});
+window.logoutUser=async()=>{clearTimeout(window.__saveT);await signOut(auth)};
+window.cloudSave=()=>{clearTimeout(window.__saveT);if(!fbUser||typeof st==='undefined')return;let uid=fbUser.uid,email=fbUser.email,generation=authGeneration,data=structuredClone(st);window.__saveT=setTimeout(async()=>{if(!fbUser||fbUser.uid!==uid||authGeneration!==generation)return;try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:new Date().toISOString()},{merge:true})}catch(e){authMsg('השמירה בענן נכשלה: '+e.message,false)}},900)}
+window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);let uid=fbUser.uid,email=fbUser.email,data=structuredClone(st);try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:new Date().toISOString()},{merge:true})}catch(e){authMsg('השמירה בענן נכשלה: '+e.message,false)}}
+onAuthStateChanged(auth,async u=>{
+ clearTimeout(window.__saveT);authGeneration++;fbUser=u;
+ if(sharedViewId){fbUser=null;await loadSharedView(sharedViewId);return}
+ if(!u){pendingRegistration=false;switchStoredState(GUEST_KEY,freshState());authMsg('לא מחובר. הנתונים האישיים מוסתרים עד להתחברות.',false);show('Profile');render();return}
+ let generation=authGeneration,key=userStorageKey(u.uid),cached=safeStoredState(key),isNew=pendingRegistration;pendingRegistration=false;
+ authMsg('טוען את הנתונים של '+u.email+'...',true);
+ try{
+  let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(generation!==authGeneration||!fbUser||fbUser.uid!==u.uid)return;
+  if(snap.exists()&&snap.data().data){switchStoredState(key,snap.data().data)}
+  else if(isNew){switchStoredState(key,freshState());await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
+  else if(cached){switchStoredState(key,cached);await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true})}
+  else{
+   let claimedBy=localStorage.getItem('healthy_life_legacy_claimed_by'),legacy=safeStoredState(LEGACY_KEY);
+   if(legacy&&!claimedBy){localStorage.setItem('healthy_life_legacy_claimed_by',u.uid);switchStoredState(key,legacy)}else switchStoredState(key,freshState());
+   await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true});
+  }
+  authMsg('מחובר: '+u.email+' - הנתונים נשמרים בחשבון האישי שלך',true);render();if(st.profile.saved)show('Today');else show('Profile')
+ }catch(e){if(generation!==authGeneration)return;switchStoredState(key,cached||freshState());authMsg('טעינת החשבון נכשלה: '+e.message,false);render()}
+});
 window.__cloudSaveHook=()=>{if(window.cloudSave)window.cloudSave()}
+if(registrationLinkMode&&!sharedViewId){shareMsg('זהו קישור ריק. הירשם כדי ליצור פרופיל ומעקב אישיים משלך.',true);show('Profile')}
 </script>
 
 <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'}).then(reg=>reg.update()).catch(console.warn);}</script></body>
