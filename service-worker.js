@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v55-preserve-guest-meals';
+const CACHE_NAME='healthy-app-v56-persistent-account-sync';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
