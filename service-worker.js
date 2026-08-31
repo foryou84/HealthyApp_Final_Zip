@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v56-persistent-account-sync';
+const CACHE_NAME='healthy-app-v57-cloud-size-fix';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{

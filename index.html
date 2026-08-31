@@ -384,6 +384,16 @@ function safeStoredState(key){try{let value=JSON.parse(localStorage.getItem(key)
 function freshState(){return structuredClone(base)}
 function userStorageKey(uid){return 'healthy_life_user_v2_'+uid}
 function storedStateOrFresh(key){return safeStoredState(key)||freshState()}
+function cloudSafeValue(value,key=''){
+ if(value===undefined)return null;
+ if(key==='mabat')return [];
+ if(value==null||typeof value==='number'||typeof value==='boolean')return value;
+ if(typeof value==='string'){if(/^data:(?:image|audio|video)\//i.test(value)||/(?:photo|imageData|audioData|videoData)$/i.test(key))return '';return value}
+ if(Array.isArray(value))return value.map(item=>cloudSafeValue(item,key));
+ if(typeof value==='object'){let out={};Object.entries(value).forEach(([childKey,childValue])=>{out[childKey]=cloudSafeValue(childValue,childKey)});return out}
+ return value
+}
+function cloudSafeState(source){let data=cloudSafeValue(source||{});data.mabat=[];data._cloudSchema=2;return data}
 function mergeUniqueById(first=[],second=[]){let out=new Map();[...(first||[]),...(second||[])].forEach((item,index)=>{let key=item?.id!=null?'id:'+String(item.id):'value:'+JSON.stringify(item)+'#'+index;out.set(key,structuredClone(item))});return [...out.values()]}
 function mergeAccountStates(remoteState,localState){
  let remote=remoteState&&typeof remoteState==='object'?remoteState:{},local=localState&&typeof localState==='object'?localState:{},merged={...freshState(),...structuredClone(remote),...structuredClone(local)};
@@ -407,6 +417,7 @@ function chooseAccountState(remoteState,localState,remoteUpdatedAt=''){
 }
 let activeStorageKey=GUEST_KEY;
 let st=safeStoredState(GUEST_KEY)||freshState();
+if(Array.isArray(st.mabat)&&st.mabat.length)st.mabat=[];
 let readOnlyMode=false;
 let manualMode='serving';
 let analysisRange='week';
@@ -483,7 +494,7 @@ function syncProfileForm(){
  document.getElementById('goal').value=p.goal||'cut';
  let provider=document.getElementById('aiProvider');if(provider)provider.value=p.aiProvider||'auto';
 }
-function switchStoredState(key,nextState,persist=true){activeStorageKey=key;st=nextState&&typeof nextState==='object'?structuredClone(nextState):freshState();if(persist)localStorage.setItem(activeStorageKey,JSON.stringify(st));syncProfileForm()}
+function switchStoredState(key,nextState,persist=true){activeStorageKey=key;st=nextState&&typeof nextState==='object'?structuredClone(nextState):freshState();st.mabat=[];if(persist)localStorage.setItem(activeStorageKey,JSON.stringify(st));syncProfileForm()}
 function applyReadOnlyUi(){
  if(!readOnlyMode)return;
  document.body.classList.add('read-only-mode');
@@ -1178,8 +1189,8 @@ window.registerUser=async(email,pw)=>{try{await authPersistenceReady;pendingRegi
 window.loginUser=async(email,pw)=>{try{await authPersistenceReady;await signInWithEmailAndPassword(auth,email,pw)}catch(e){authMsg(e.message,false)}}
 window.resetPassword=async(email)=>{try{email=(email||'').trim();if(!email)throw new Error('הזן כתובת אימייל');await sendPasswordResetEmail(auth,email);authMsg('נשלח מייל לאיפוס סיסמה ל-'+email,true)}catch(e){authMsg('איפוס סיסמה: '+e.message,false)}}
 window.logoutUser=async()=>{clearTimeout(window.__saveT);await signOut(auth)};
-window.cloudSave=()=>{clearTimeout(window.__saveT);if(!fbUser||typeof st==='undefined')return;let uid=fbUser.uid,email=fbUser.email,generation=authGeneration,data=structuredClone(st);window.__saveT=setTimeout(async()=>{if(!fbUser||fbUser.uid!==uid||authGeneration!==generation)return;try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:data._updatedAt||new Date().toISOString()},{merge:true});authMsg('מחובר: '+email+' - הנתונים נשמרו במכשיר ובענן',true)}catch(e){authMsg('הנתונים נשמרו במכשיר, אך השמירה בענן נכשלה: '+e.message,false);console.error('cloud state save failed',e)}},900)}
-window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);let uid=fbUser.uid,email=fbUser.email,data=structuredClone(st);try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:data._updatedAt||new Date().toISOString()},{merge:true});authMsg('מחובר: '+email+' - הנתונים נשמרו במכשיר ובענן',true)}catch(e){authMsg('הנתונים נשמרו במכשיר, אך השמירה בענן נכשלה: '+e.message,false);console.error('forced cloud state save failed',e);throw e}}
+window.cloudSave=()=>{clearTimeout(window.__saveT);if(!fbUser||typeof st==='undefined')return;let uid=fbUser.uid,email=fbUser.email,generation=authGeneration,data=cloudSafeState(st);window.__saveT=setTimeout(async()=>{if(!fbUser||fbUser.uid!==uid||authGeneration!==generation)return;try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:data._updatedAt||new Date().toISOString()},{merge:true});authMsg('מחובר: '+email+' - הנתונים נשמרו במכשיר ובענן',true)}catch(e){authMsg('הנתונים נשמרו במכשיר, אך השמירה בענן נכשלה: '+e.message,false);console.error('cloud state save failed',e)}},900)}
+window.forceCloudSave=async()=>{if(!fbUser||typeof st==='undefined')return;clearTimeout(window.__saveT);let uid=fbUser.uid,email=fbUser.email,data=cloudSafeState(st);try{await setDoc(doc(db,'users',uid),{email,data,updatedAt:data._updatedAt||new Date().toISOString()},{merge:true});authMsg('מחובר: '+email+' - הנתונים נשמרו במכשיר ובענן',true)}catch(e){authMsg('הנתונים נשמרו במכשיר, אך השמירה בענן נכשלה: '+e.message,false);console.error('forced cloud state save failed',e);throw e}}
 await authPersistenceReady;
 onAuthStateChanged(auth,async u=>{
  clearTimeout(window.__saveT);authGeneration++;fbUser=u;
@@ -1195,13 +1206,13 @@ onAuthStateChanged(auth,async u=>{
  authMsg('טוען את הנתונים של '+u.email+'...',true);
  try{
   let ref=doc(db,'users',u.uid),snap=await getDoc(ref);if(generation!==authGeneration||!fbUser||fbUser.uid!==u.uid)return;
-  if(snap.exists()&&snap.data().data){let remote=snap.data().data,selected=chooseAccountState(remote,cached,snap.data().updatedAt);switchStoredState(key,selected);await setDoc(ref,{email:u.email,data:st,updatedAt:st._updatedAt||new Date().toISOString()},{merge:true})}
-  else if(isNew){switchStoredState(key,freshState());await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
-  else if(cached){switchStoredState(key,cached);await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true})}
+  if(snap.exists()&&snap.data().data){let remote=snap.data().data,selected=chooseAccountState(remote,cached,snap.data().updatedAt);switchStoredState(key,selected);await setDoc(ref,{email:u.email,data:cloudSafeState(st),updatedAt:st._updatedAt||new Date().toISOString()},{merge:true})}
+  else if(isNew){switchStoredState(key,freshState());await setDoc(ref,{email:u.email,data:cloudSafeState(st),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})}
+  else if(cached){switchStoredState(key,cached);await setDoc(ref,{email:u.email,data:cloudSafeState(st),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true})}
   else{
    let claimedBy=localStorage.getItem('healthy_life_legacy_claimed_by'),legacy=safeStoredState(LEGACY_KEY);
    if(legacy&&!claimedBy){localStorage.setItem('healthy_life_legacy_claimed_by',u.uid);switchStoredState(key,legacy)}else switchStoredState(key,freshState());
-   await setDoc(ref,{email:u.email,data:st,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true});
+   await setDoc(ref,{email:u.email,data:cloudSafeState(st),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{merge:true});
   }
   authMsg('מחובר: '+u.email+' - הנתונים נשמרים בחשבון האישי שלך',true);render();if(st.profile.saved)show('Today');else show('Profile')
  }catch(e){if(generation!==authGeneration)return;switchStoredState(key,cached||freshState());authMsg('טעינת החשבון נכשלה: '+e.message,false);render()}
