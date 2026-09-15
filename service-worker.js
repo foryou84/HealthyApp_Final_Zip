@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v60-dietitian-xlsx';
+const CACHE_NAME='healthy-app-v61-dietitian-excel';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{

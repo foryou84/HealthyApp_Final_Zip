@@ -983,21 +983,21 @@ function monthlyReportTables(monthKey){
  });
  return {summary,foods,days}
 }
+function excelXmlEscape(value){return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;')}
+function excelXmlWorkbook(sheets){
+ let rowsXml=rows=>rows.map((row,rowIndex)=>'<Row>'+row.map(value=>{let numeric=typeof value==='number'&&Number.isFinite(value),style=rowIndex===0?' ss:StyleID="Header"':'';return `<Cell${style}><Data ss:Type="${numeric?'Number':'String'}">${excelXmlEscape(value)}</Data></Cell>`}).join('')+'</Row>').join('');
+ return `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Arial" ss:Size="11"/></Style><Style ss:ID="Header"><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Font ss:FontName="Arial" ss:Size="11" ss:Bold="1"/><Interior ss:Color="#DCEBFF" ss:Pattern="Solid"/></Style></Styles>${sheets.map(sheet=>`<Worksheet ss:Name="${excelXmlEscape(sheet.name)}"><Table>${rowsXml(sheet.rows)}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/><FreezePanes/><FrozenNoSplit/><SplitHorizontal>1</SplitHorizontal><TopRowBottomPane>1</TopRowBottomPane></WorksheetOptions></Worksheet>`).join('')}</Workbook>`
+}
 async function monthlyReportFile(monthKey){
- let XLSX=await loadSheetJs(),tables=monthlyReportTables(monthKey),workbook=XLSX.utils.book_new();
+ let tables=monthlyReportTables(monthKey);
  let title='דוח תזונה לדיאטנית - '+analysisMonthLabel(monthKey),profile=st.profile||{},targets=st.targets||{};
  let overview=[
   [title],['הופק בתאריך',new Date().toLocaleDateString('he-IL')],['ימים עם רישום',tables.days.length],['ימים שנכללו בניתוח',tables.days.filter(day=>!st.analysisExcludedDates?.[day.date]).length],[],
   ['נתונים אישיים'],['גיל',n(profile.age)||''],['גובה בס״מ',n(profile.height)||''],['משקל בק״ג',n(profile.weight)||''],[],
   ['יעדים יומיים'],['קלוריות',n(targets.calories)],['חלבון בגרם',n(targets.protein)],['פחמימה בגרם',n(targets.carbs)],['שומן בגרם',n(targets.fat)],['ירקות בגרם',n(targets.veg)],['מים במ״ל',n(targets.water)]
  ];
- let overviewSheet=XLSX.utils.aoa_to_sheet(overview),summarySheet=XLSX.utils.aoa_to_sheet(tables.summary),foodsSheet=XLSX.utils.aoa_to_sheet(tables.foods);
- overviewSheet['!cols']=[{wch:30},{wch:24}];summarySheet['!cols']=[{wch:13},{wch:12},{wch:17},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}];foodsSheet['!cols']=[{wch:13},{wch:12},{wch:17},{wch:12},{wch:10},{wch:34},{wch:12},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:24}];
- if(tables.summary.length>1)summarySheet['!autofilter']={ref:`A1:L${tables.summary.length}`};if(tables.foods.length>1)foodsSheet['!autofilter']={ref:`A1:N${tables.foods.length}`};
- XLSX.utils.book_append_sheet(workbook,overviewSheet,'תקציר');XLSX.utils.book_append_sheet(workbook,summarySheet,'סיכום יומי');XLSX.utils.book_append_sheet(workbook,foodsSheet,'מה אכלתי');
- workbook.Props={Title:title,Subject:'פירוט תזונה חודשי לייעוץ דיאטנית',Author:'אורח חיים בריא',CreatedDate:new Date()};
- let data=XLSX.write(workbook,{bookType:'xlsx',type:'array'});
- return new File([data],`nutrition-report-dietitian-${monthKey}.xlsx`,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+ let xml=excelXmlWorkbook([{name:'תקציר',rows:overview},{name:'סיכום יומי',rows:tables.summary},{name:'מה אכלתי',rows:tables.foods}]);
+ return new File([xml],`nutrition-report-dietitian-${monthKey}.xls`,{type:'application/vnd.ms-excel;charset=utf-8'})
 }
 function dietitianTemplateCsv(monthKey){
  let rows=[
@@ -1007,9 +1007,8 @@ function dietitianTemplateCsv(monthKey){
  return '\ufeff'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')
 }
 async function dietitianTemplateFile(monthKey){
- let XLSX=await loadSheetJs(),rows=[['חודש','שינוי מומלץ','פירוט או הנחיה','יעד או כמות','עדיפות'],[monthKey,'לדוגמה: להוסיף ארוחת בוקר','מה לאכול ובאילו ימים','5 ימים בשבוע','גבוהה']],sheet=XLSX.utils.aoa_to_sheet(rows),workbook=XLSX.utils.book_new();
- sheet['!cols']=[{wch:12},{wch:30},{wch:42},{wch:22},{wch:14}];XLSX.utils.book_append_sheet(workbook,sheet,'המלצות דיאטנית');
- let data=XLSX.write(workbook,{bookType:'xlsx',type:'array'});return new File([data],`dietitian-plan-template-${monthKey}.xlsx`,{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+ let rows=[['חודש','שינוי מומלץ','פירוט או הנחיה','יעד או כמות','עדיפות'],[monthKey,'לדוגמה: להוסיף ארוחת בוקר','מה לאכול ובאילו ימים','5 ימים בשבוע','גבוהה']],xml=excelXmlWorkbook([{name:'המלצות דיאטנית',rows}]);
+ return new File([xml],`dietitian-plan-template-${monthKey}.xls`,{type:'application/vnd.ms-excel;charset=utf-8'})
 }
 function downloadFile(file){let url=URL.createObjectURL(file),link=document.createElement('a');
  link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
@@ -1064,8 +1063,13 @@ function loadSheetJs(){
  if(window.XLSX)return Promise.resolve(window.XLSX);
  return new Promise((resolve,reject)=>{let existing=document.getElementById('sheetJsLoader');if(existing){existing.addEventListener('load',()=>resolve(window.XLSX),{once:true});existing.addEventListener('error',()=>reject(new Error('טעינת קורא Excel נכשלה')),{once:true});return}let script=document.createElement('script');script.id='sheetJsLoader';script.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';script.onload=()=>window.XLSX?resolve(window.XLSX):reject(new Error('קורא Excel לא נטען'));script.onerror=()=>reject(new Error('טעינת קורא Excel נכשלה'));document.head.appendChild(script)})
 }
+function spreadsheetXmlRows(text){
+ let doc=new DOMParser().parseFromString(String(text||''),'application/xml');if(doc.querySelector('parsererror'))return [];
+ return Array.from(doc.getElementsByTagNameNS('*','Row')).map(row=>Array.from(row.getElementsByTagNameNS('*','Cell')).map(cell=>cell.textContent?.trim()||''))
+}
 async function readDietitianWorkbook(file){
  if(/\.csv$/i.test(file.name)||/text\/csv/i.test(file.type))return recommendationRowsFromGrid(parseCsvRows(await file.text()));
+ if(/\.xls$/i.test(file.name)||/application\/vnd\.ms-excel/i.test(file.type)){let text=await file.text();if(/<Workbook[\s>]/i.test(text))return recommendationRowsFromGrid(spreadsheetXmlRows(text))}
  let XLSX=await loadSheetJs(),book=XLSX.read(await file.arrayBuffer(),{type:'array'}),best=[];
  for(let name of book.SheetNames){let rows=recommendationRowsFromGrid(XLSX.utils.sheet_to_json(book.Sheets[name],{header:1,defval:'',raw:false}));if(rows.length>best.length)best=rows}
  return best
