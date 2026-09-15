@@ -57,8 +57,19 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .weekly-meal-head{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:10px;background:#f8fafc}
 .weekly-meal-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .weekly-meal-actions button{width:auto;margin:0;padding:7px 9px;font-size:12px}
-.weekly-entry{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;padding:10px;border-top:1px solid var(--b)}
+.weekly-entry{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:start;padding:10px;border-top:1px solid var(--b)}
 .weekly-entry:first-of-type{border-top:0}
+.weekly-entry-edit{width:auto;margin:0;padding:7px 9px;background:#eaf3ff;color:#075985;font-size:12px}
+.history-food-toolbar{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:10px 0}
+.history-food-toolbar button{width:auto;margin:0}
+.history-food-editor{border:2px solid #93c5fd;background:#eff6ff;border-radius:18px;padding:12px;margin:12px 0}
+.history-food-editor h4{margin:0 0 8px;font-size:17px}
+.history-food-editor .history-editor-main{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:8px}
+.history-food-editor .history-editor-values{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:8px}
+.history-food-editor .history-editor-actions{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px;margin-top:9px}
+.history-food-editor button{margin:0}
+.history-food-editor label{font-size:11px;margin-top:4px}
+.history-food-editor input,.history-food-editor select{padding:9px}
 .month-toolbar{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:10px 0}
 .month-toolbar button{width:auto;margin:0;padding:9px 12px}
 .month-toolbar strong{text-align:center;font-size:18px}
@@ -103,6 +114,7 @@ nav button.on{background:#eaf3ff;color:var(--blue)}.ico{display:block;font-size:
 .chev{font-size:18px;color:var(--muted)}
 
 @media(max-width:420px){.grid2,.result-grid{grid-template-columns:1fr}}
+@media(max-width:420px){.history-food-editor .history-editor-main{grid-template-columns:1fr 1fr}.history-food-editor .history-editor-main>div:first-child{grid-column:1/-1}.history-food-editor .history-editor-values{grid-template-columns:repeat(3,1fr)}.history-food-editor .history-editor-actions{grid-template-columns:1fr}.weekly-entry{grid-template-columns:auto minmax(0,1fr)}.weekly-entry-edit{grid-column:2}}
 
 .chatbox{max-height:320px;overflow:auto;background:#f8fafc;border:1px solid var(--b);border-radius:18px;padding:10px;margin-top:10px}.bubble{padding:10px 12px;border-radius:16px;margin:8px 0;line-height:1.5;font-size:14px}.userbubble{background:#eaf3ff;color:#075985}.aibubble{background:#fff;border:1px solid var(--b)}.photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.edit-food{background:#f8fafc;border:1px solid var(--b);border-radius:18px;padding:12px;margin:8px 0}
 .manual-card{padding:14px}
@@ -422,6 +434,7 @@ let readOnlyMode=false;
 let manualMode='serving';
 let analysisRange='week';
 let openHistoryDayDate='';
+let historyFoodEditor={dateKey:'',entryId:'',meal:'בוקר'};
 let analysisMonthKey=localDateKey().slice(0,7);
 const tutorialSlides=[
  {icon:'🔐',title:'1. התחברות או הרשמה',text:'נכנסים עם אימייל וסיסמה. משתמש חדש נרשם ומקבל חשבון ריק ונפרד. הנתונים של משתמש אחד אינם משפיעים על משתמש אחר.'},
@@ -1049,7 +1062,11 @@ function historyDayTotals(day){
  return (day?.entries||[]).reduce((a,e)=>(a.cal+=n(e.cal),a.p+=n(e.p),a.c+=n(e.c),a.f+=n(e.f),a.v+=n(e.v),a),{cal:0,p:0,c:0,f:0,v:0})
 }
 function historyDayMealCount(day){return ['בוקר','צהריים','ערב','ביניים'].filter(meal=>(day?.entries||[]).some(e=>(e.meal||'ביניים')===meal)).length}
-function toggleHistoryDayDetails(dateKey){openHistoryDayDate=openHistoryDayDate===dateKey?'':dateKey;renderHistoryAnalysis()}
+function historyDayCanEdit(dateKey){
+ let today=new Date(todayKey()+'T12:00:00'),day=new Date(dateKey+'T12:00:00'),diff=Math.round((today-day)/86400000);
+ return diff>=0&&diff<=7
+}
+function toggleHistoryDayDetails(dateKey){openHistoryDayDate=openHistoryDayDate===dateKey?'':dateKey;if(openHistoryDayDate!==dateKey)historyFoodEditor={dateKey:'',entryId:'',meal:'בוקר'};renderHistoryAnalysis()}
 function toggleHistoryMealSelection(dateKey,meal){
  let boxes=Array.from(document.querySelectorAll('.weekly-entry-check')).filter(box=>box.dataset.date===dateKey&&box.dataset.meal===meal);
  let shouldCheck=!boxes.length?false:!boxes.every(box=>box.checked);
@@ -1058,6 +1075,60 @@ function toggleHistoryMealSelection(dateKey,meal){
 function historyDayByDate(dateKey){
  if(dateKey===todayKey())archiveCurrentDay();
  return st.history?.[dateKey]||null;
+}
+function editableHistoryDay(dateKey){
+ if(!historyDayCanEdit(dateKey))return null;
+ if(!st.history)st.history={};
+ if(dateKey===todayKey())archiveCurrentDay();
+ if(!st.history[dateKey])st.history[dateKey]={date:dateKey,entries:[],water:0,steps:0,workouts:[],targets:{...st.targets}};
+ if(!Array.isArray(st.history[dateKey].entries))st.history[dateKey].entries=[];
+ return st.history[dateKey]
+}
+function openHistoryFoodEditor(dateKey,entryId='',meal='בוקר'){
+ if(readOnlyMode)return;
+ if(!historyDayCanEdit(dateKey)){alert('אפשר לערוך ולהוסיף מאכלים רק עד שבוע אחורה.');return}
+ historyFoodEditor={dateKey,entryId:String(entryId||''),meal:meal||'בוקר'};openHistoryDayDate=dateKey;renderHistoryAnalysis()
+}
+function closeHistoryFoodEditor(){historyFoodEditor={dateKey:'',entryId:'',meal:'בוקר'};renderHistoryAnalysis()}
+function historyEditorValue(id){return document.getElementById(id)?.value??''}
+function fillHistoryFoodFromDatabase(){
+ let name=String(historyEditorValue('historyFoodName')).trim(),amount=n(historyEditorValue('historyFoodAmount'));
+ if(!name||amount<=0){alert('רשום שם מאכל וכמות בגרם או מ״ל.');return}
+ let food=findFood(name);if(!food){alert('לא נמצאה התאמה במאגר. אפשר למלא את הערכים ידנית.');return}
+ let q=amount/100;
+ document.getElementById('historyFoodName').value=food.name;
+ document.getElementById('historyFoodUnit').value=food.u==='ml'?'ml':'g';
+ ['Cal','Protein','Carbs','Fat','Veg'].forEach((suffix,index)=>{let field=document.getElementById('historyFood'+suffix),value=[food.cal,food.p,food.c,food.f,food.v][index];if(field)field.value=r(n(value)*q)});
+ let status=document.getElementById('historyFoodStatus');if(status){status.textContent='נמצאה התאמה: '+food.name+' ('+(food.src||'מאגר מקומי')+')';status.className='notice ok'}
+}
+async function saveHistoryFoodEditor(){
+ let dateKey=historyFoodEditor.dateKey,day=editableHistoryDay(dateKey);if(!day)return;
+ let name=String(historyEditorValue('historyFoodName')).trim(),amount=n(historyEditorValue('historyFoodAmount')),meal=historyEditorValue('historyFoodMeal')||'ביניים';
+ if(!name){alert('צריך לרשום שם מאכל.');return}if(amount<=0){alert('צריך לרשום כמות גדולה מאפס.');return}
+ let values={cal:n(historyEditorValue('historyFoodCal')),p:n(historyEditorValue('historyFoodProtein')),c:n(historyEditorValue('historyFoodCarbs')),f:n(historyEditorValue('historyFoodFat')),v:n(historyEditorValue('historyFoodVeg'))};
+ let existing=day.entries.find(e=>String(e.id)===historyFoodEditor.entryId),food=findFood(name);
+ if(!existing&&!Object.values(values).some(value=>value>0)&&food){let q=amount/100;values={cal:n(food.cal)*q,p:n(food.p)*q,c:n(food.c)*q,f:n(food.f)*q,v:n(food.v)*q}}
+ let entry={...(existing||{}),id:existing?.id||Date.now()+Math.random(),date:dateKey,time:existing?.time||new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}),meal,name,amount,unit:historyEditorValue('historyFoodUnit')||'g',cal:values.cal,p:values.p,c:values.c,f:values.f,v:values.v,w:n(existing?.w),src:existing?.src||(food?.src||'השלמה ידנית')};
+ delete entry.enteredAmount;delete entry.enteredUnit;
+ if(existing)Object.assign(existing,entry);else day.entries.unshift(entry);
+ if(dateKey===todayKey()){st.entries=day.entries;st.history[dateKey].entries=st.entries}
+ historyFoodEditor={dateKey:'',entryId:'',meal:'בוקר'};save();
+ if(typeof window.forceCloudSave==='function'){try{await window.forceCloudSave()}catch(error){console.error('history food cloud save failed',error)}}
+ render()
+}
+async function deleteHistoryFoodEntry(){
+ let dateKey=historyFoodEditor.dateKey,day=editableHistoryDay(dateKey);if(!day||!historyFoodEditor.entryId)return;
+ let item=day.entries.find(e=>String(e.id)===historyFoodEditor.entryId);if(!item||!confirm('למחוק את „'+item.name+'” מהיום הזה?'))return;
+ day.entries=day.entries.filter(e=>String(e.id)!==historyFoodEditor.entryId);if(dateKey===todayKey())st.entries=day.entries;
+ historyFoodEditor={dateKey:'',entryId:'',meal:'בוקר'};save();
+ if(typeof window.forceCloudSave==='function'){try{await window.forceCloudSave()}catch(error){console.error('history food delete cloud save failed',error)}}
+ render()
+}
+function renderHistoryFoodEditor(day){
+ if(historyFoodEditor.dateKey!==day.date)return '';
+ let entry=(day.entries||[]).find(e=>String(e.id)===historyFoodEditor.entryId),esc=escapeHtml,meal=entry?.meal||historyFoodEditor.meal||'בוקר';
+ let val=(key,fallback='')=>esc(entry?.[key]??fallback),selected=value=>meal===value?'selected':'';
+ return `<div class="history-food-editor"><h4>${entry?'עריכת מאכל':'הוספת מאכל שנשכח'} — ${historyDateLabel(day.date)}</h4><div class="small">רשום שם וכמות ולחץ „מלא מהמאגר”, או הזן את הערכים הכוללים ידנית לפי האריזה.</div><div class="history-editor-main"><div><label>שם המאכל</label><input id="historyFoodName" value="${val('name')}" placeholder="לדוגמה: קוטג׳ 5%"></div><div><label>ארוחה</label><select id="historyFoodMeal"><option ${selected('בוקר')}>בוקר</option><option ${selected('צהריים')}>צהריים</option><option ${selected('ערב')}>ערב</option><option ${selected('ביניים')}>ביניים</option></select></div><div><label>כמות</label><input id="historyFoodAmount" inputmode="decimal" value="${val('amount')}" placeholder="150"></div></div><div class="grid2"><div><label>יחידה</label><select id="historyFoodUnit"><option value="g" ${entry?.unit!=='ml'?'selected':''}>גרם</option><option value="ml" ${entry?.unit==='ml'?'selected':''}>מ״ל</option></select></div><div style="align-self:end"><button type="button" style="background:#0f766e" onclick="fillHistoryFoodFromDatabase()">מלא מהמאגר</button></div></div><div class="history-editor-values"><div><label>קלוריות</label><input id="historyFoodCal" inputmode="decimal" value="${val('cal',0)}"></div><div><label>חלבון</label><input id="historyFoodProtein" inputmode="decimal" value="${val('p',0)}"></div><div><label>פחמימה</label><input id="historyFoodCarbs" inputmode="decimal" value="${val('c',0)}"></div><div><label>שומן</label><input id="historyFoodFat" inputmode="decimal" value="${val('f',0)}"></div><div><label>ירקות</label><input id="historyFoodVeg" inputmode="decimal" value="${val('v',0)}"></div></div><div id="historyFoodStatus" class="small" style="margin-top:7px"></div><div class="history-editor-actions"><button type="button" onclick="saveHistoryFoodEditor()">שמור ביום זה</button><button type="button" style="background:#6b7280" onclick="closeHistoryFoodEditor()">בטל</button>${entry?'<button type="button" class="week-day-delete" onclick="deleteHistoryFoodEntry()">מחק מאכל</button>':'<span></span>'}</div></div>`
 }
 function saveHistoryMealSelection(dateKey,meal){
  let day=historyDayByDate(dateKey);
@@ -1092,10 +1163,12 @@ async function deleteHistoryDay(dateKey){
 }
 function renderWeekDayDetails(day){
  let esc=value=>String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
- return ['בוקר','צהריים','ערב','ביניים'].map(meal=>{
+ let meals=['בוקר','צהריים','ערב','ביניים'],canEdit=historyDayCanEdit(day.date)&&!readOnlyMode;
+ let toolbar=canEdit?`<div class="history-food-toolbar"><b>תיקון עד שבוע אחורה</b><button type="button" onclick="openHistoryFoodEditor('${day.date}')">➕ הוסף מאכל שנשכח</button></div>`:`<div class="small">${readOnlyMode?'זהו קישור לצפייה בלבד.':'העריכה זמינה רק לשבעת הימים האחרונים.'}</div>`;
+ return toolbar+renderHistoryFoodEditor(day)+meals.map(meal=>{
   let items=(day.entries||[]).filter(e=>(e.meal||'ביניים')===meal);
   let total=items.reduce((a,e)=>a+n(e.cal),0);
-  let list=items.length?items.map(e=>`<label class="weekly-entry"><input type="checkbox" class="weekly-entry-check" data-date="${day.date}" data-meal="${meal}" data-entry-id="${esc(e.id)}"><span><b>${esc(e.name)}</b><div class="small">${esc(entryAmountText(e))} | ${r(e.cal)} קל׳ | חלבון ${r(e.p)} | פחמימה ${r(e.c)} | שומן ${r(e.f)}</div></span></label>`).join(''):'<div class="emptymeal" style="padding:10px">לא נרשמו מאכלים.</div>';
+  let list=items.length?items.map(e=>`<div class="weekly-entry"><input type="checkbox" class="weekly-entry-check" data-date="${day.date}" data-meal="${meal}" data-entry-id="${esc(e.id)}"><span><b>${esc(e.name)}</b><div class="small">${esc(entryAmountText(e))} | ${r(e.cal)} קל׳ | חלבון ${r(e.p)} | פחמימה ${r(e.c)} | שומן ${r(e.f)}</div></span>${canEdit?`<button type="button" class="weekly-entry-edit" onclick="openHistoryFoodEditor('${day.date}','${esc(e.id)}','${meal}')">ערוך</button>`:''}</div>`).join(''):'<div class="emptymeal" style="padding:10px">לא נרשמו מאכלים.</div>';
   return `<div class="weekly-meal"><div class="weekly-meal-head"><div><b>${meal}</b><div class="small">${items.length} פריטים | ${r(total)} קל׳</div></div>${items.length?`<div class="weekly-meal-actions"><button type="button" class="chip" onclick="event.stopPropagation();toggleHistoryMealSelection('${day.date}','${meal}')">בחר הכל</button><button type="button" onclick="event.stopPropagation();saveHistoryMealSelection('${day.date}','${meal}')">שמור נבחרים לקבועות</button></div>`:''}</div>${list}</div>`
  }).join('')
 }
@@ -1125,7 +1198,7 @@ function renderHistoryAnalysis(){
  let days=trackedDays.filter(d=>!st.analysisExcludedDates[d.date]);
  let selector='';
  if(analysisRange==='week'){
-  selector=`<div class="analysis-card"><b>ניתוח שבועי לפי יום</b><div class="small">לחץ על יום כדי לראות מה אכלת. כבה יום חלקי כדי שלא ייכנס לממוצע, או מחק אותו לחלוטין.</div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
+  selector=`<div class="analysis-card"><b>ניתוח שבועי לפי יום</b><div class="small">לחץ על יום כדי לראות מה אכלת, לערוך מאכל או להוסיף מאכל שנשכח. כבה יום חלקי כדי שלא ייכנס לממוצע, או מחק אותו לחלוטין.</div>${displayDays.map(renderWeekDayCard).join('')}</div>`;
  }else if(analysisRange==='month'){
   let atCurrent=analysisMonthKey===currentMonthKey();
   selector=`<div class="analysis-card"><b>מעקב חודשי לפי יום</b><div class="month-toolbar"><button type="button" onclick="shiftAnalysisMonth(-1)">הקודם</button><strong>${analysisMonthLabel(analysisMonthKey)}</strong><button type="button" ${atCurrent?'disabled style="opacity:.4"':''} onclick="shiftAnalysisMonth(1)">הבא</button></div><div class="small">לחץ על יום להצגת הארוחות. יום שכיבית נשמר, אך אינו נכנס לממוצע החודשי.</div><div class="month-export-actions"><button type="button" onclick="downloadMonthlyExcel()">ייצא לאקסל</button><button type="button" style="background:#6b7280" onclick="shareMonthlyReport()">שלח במייל</button></div>${displayDays.map(renderWeekDayCard).join('')}</div><div class="analysis-card dietitian-panel"><b>🥗 ייעוץ ותוכנית מדיאטנית</b><div class="small">שלח לדיאטנית את הדוח החודשי יחד עם תבנית המלצות. לאחר שתחזיר תוכנית Excel, העלה אותה וסמן לכל שינוי מה אפשר לבצע.</div><div class="dietitian-actions"><button type="button" onclick="sendForDietitianConsultation()">שלח לייעוץ דיאטנית</button><button type="button" style="background:#0f766e" onclick="document.getElementById('dietitianPlanFile').click()">העלה תוכנית Excel</button></div><input id="dietitianPlanFile" class="hide" type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" onchange="importDietitianPlan(event)">${renderDietitianPlan(analysisMonthKey)}</div>`;

@@ -1,4 +1,4 @@
-const CACHE_NAME='healthy-app-v57-cloud-size-fix';
+const CACHE_NAME='healthy-app-v58-history-food-edit';
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icon.svg','./meal-table-fix.js'];
 
 self.addEventListener('install',event=>{
